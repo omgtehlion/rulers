@@ -5,8 +5,6 @@ const AlphaWnd = @import("alpha_wnd.zig");
 const Guide = @import("guide.zig");
 const globals = @import("globals.zig");
 
-const WM_TRAY = win.WM_USER + 0x01;
-
 const RULER_WIDTH = 16;
 const MAJOR_TICK = 50;
 const MINOR_TICK = 5;
@@ -18,18 +16,15 @@ const LABEL_Y_OFFSET = -2;
 const Self = @This();
 
 base: AlphaWnd,
-nid: win.NOTIFYICONDATAA = undefined,
 current_guide: ?*Guide = null,
 allocator: std.mem.Allocator,
 vertical: bool,
-has_tray: bool,
 monitor: win.MonitorInfo,
 
-pub fn create(allocator: std.mem.Allocator, vertical: bool, has_tray: bool, monitor: win.MonitorInfo) !*Self {
+pub fn create(allocator: std.mem.Allocator, vertical: bool, monitor: win.MonitorInfo) !*Self {
     const self = try allocator.create(Self);
     self.allocator = allocator;
     self.vertical = vertical;
-    self.has_tray = has_tray;
     self.monitor = monitor;
     try AlphaWnd.createAt(
         &self.base,
@@ -48,14 +43,10 @@ pub fn create(allocator: std.mem.Allocator, vertical: bool, has_tray: bool, moni
     self.base.left = monitor.rect.left;
     self.base.top = monitor.rect.top;
     try self.createRuler();
-    if (has_tray)
-        self.setupTray();
     return self;
 }
 
 pub fn deinit(self: *Self) void {
-    if (self.has_tray)
-        _ = win.Shell_NotifyIconA(win.NIM_DELETE, &self.nid);
     self.base.deinit();
     self.allocator.destroy(self);
 }
@@ -174,21 +165,6 @@ fn createRuler(self: *Self) !void {
     self.base.redraw();
 }
 
-fn setupTray(self: *Self) void {
-    const hinstance = win.GetModuleHandleW(null);
-    self.nid = std.mem.zeroInit(win.NOTIFYICONDATAA, .{
-        .cbSize = @sizeOf(win.NOTIFYICONDATAA),
-        .hWnd = self.base.hwnd.?,
-        .hIcon = win.LoadIconA(hinstance, "MAINICON") orelse return,
-        .uFlags = win.NIF_ICON | win.NIF_TIP | win.NIF_MESSAGE,
-        .uCallbackMessage = WM_TRAY,
-    });
-    const tip = "Rulers";
-    @memcpy(self.nid.szTip[0..tip.len], tip);
-    self.nid.szTip[tip.len] = 0;
-    _ = win.Shell_NotifyIconA(win.NIM_ADD, &self.nid);
-}
-
 fn createNew(self: *Self) void {
     const p = win.getCursorPos() catch return;
     if (self.vertical) {
@@ -245,24 +221,6 @@ fn processMsg(base: *AlphaWnd, msg: win.UINT, wparam: win.WPARAM, lparam: win.LP
         },
         win.WM_SETCURSOR => {
             _ = win.SetCursor(win.LoadCursorA(null, win.IDC_ARROW) orelse null);
-            return 0;
-        },
-        WM_TRAY => {
-            if (!self.has_tray) return null;
-            switch (lparam) {
-                win.WM_MOUSEMOVE => {},
-                win.WM_LBUTTONDOWN => globals.bringToFrontAll(),
-                win.WM_MBUTTONUP => {
-                    globals.running = false;
-                    _ = win.PostMessageA(self.base.hwnd, WM_TRAY, 0, 0);
-                },
-                win.WM_RBUTTONDOWN => {
-                    globals.display_mode += 1;
-                    globals.display_mode %= 3;
-                    globals.notifyAll();
-                },
-                else => {},
-            }
             return 0;
         },
         else => return null,

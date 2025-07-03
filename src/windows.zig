@@ -114,6 +114,7 @@ pub const WM_SETCURSOR = 0x0020;
 pub const WM_ENTERSIZEMOVE = 0x0231;
 pub const WM_EXITSIZEMOVE = 0x0232;
 pub const WM_MOVING = 0x0216;
+pub const WM_DISPLAYCHANGE = 0x007E;
 pub const WM_USER = 0x0400;
 
 pub const WS_POPUP = 0x80000000;

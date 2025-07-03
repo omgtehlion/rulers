@@ -9,7 +9,6 @@ const Self = @This();
 base: AlphaWnd,
 graphics: ?*gdip.Graphics = null,
 vertical: bool,
-size: i32,
 distance: i32 = 0,
 bounds: win.RECT,
 allocator: std.mem.Allocator,
@@ -22,7 +21,7 @@ var coord_under_color: gdip.Color = 0;
 var line_pen: ?*gdip.Pen = null;
 var initialized: bool = false;
 
-pub fn create(allocator: std.mem.Allocator, is_vertical: bool, bounds: win.RECT) !*Self {
+pub fn create(allocator: std.mem.Allocator, vertical: bool, bounds: win.RECT) !*Self {
     if (!initialized) {
         try initializeStatics();
         initialized = true;
@@ -30,8 +29,7 @@ pub fn create(allocator: std.mem.Allocator, is_vertical: bool, bounds: win.RECT)
     const self = try allocator.create(Self);
     self.* = Self{
         .base = undefined,
-        .vertical = is_vertical,
-        .size = if (is_vertical) bounds.bottom - bounds.top else bounds.right - bounds.left,
+        .vertical = vertical,
         .allocator = allocator,
         .bounds = bounds,
     };
@@ -48,24 +46,30 @@ pub fn create(allocator: std.mem.Allocator, is_vertical: bool, bounds: win.RECT)
         null,
     );
     self.base.processMsg = processMsg;
-    if (is_vertical) {
-        self.base.width = 50;
-        self.base.height = self.size;
-    } else {
-        self.base.width = self.size;
-        self.base.height = 50;
-    }
-    self.base.left = bounds.left;
-    self.base.top = bounds.top;
+    try self.setBounds(bounds);
+    try globals.addGuide(self);
+    self.notify();
+    return self;
+}
+
+pub fn setBounds(self: *Self, bounds: win.RECT) !void {
+    self.bounds = bounds;
+    const width = if (self.vertical) 50 else bounds.right - bounds.left;
+    const height = if (self.vertical) bounds.bottom - bounds.top else 50;
+    if (self.vertical)
+        self.base.top = bounds.top
+    else
+        self.base.left = bounds.left;
+    if (self.graphics) |g|
+        gdip.deleteGraphics(g) catch {};
+    if (self.base.bitmap) |bmp|
+        gdip.disposeImage(@ptrCast(bmp)) catch {};
     // Create bitmap and graphics
-    self.base.bitmap = try gdip.createBitmapFromScan0(self.base.width, self.base.height, 0, gdip.PixelFormat32bppARGB, null);
+    self.base.bitmap = try gdip.createBitmapFromScan0(width, height, 0, gdip.PixelFormat32bppARGB, null);
     self.graphics = try gdip.createGraphicsFromImage(@ptrCast(self.base.bitmap.?));
     try gdip.setTextRenderingHint(self.graphics.?, .TextRenderingHintAntiAliasGridFit);
     self.repaint();
     self.base.redraw();
-    try globals.addGuide(self);
-    self.notify();
-    return self;
 }
 
 fn initializeStatics() !void {
@@ -89,12 +93,14 @@ pub fn deinit(self: *Self) void {
 fn repaint(self: *Self) void {
     if (self.graphics == null) return;
     gdip.graphicsClear(self.graphics.?, gdip.makeColor(0, 0, 0, 0)) catch return;
+    const width = self.bounds.right - self.bounds.left;
+    const height = self.bounds.bottom - self.bounds.top;
     if (globals.control_pressed)
-        gdip.fillRectangleI(self.graphics.?, transp_brush.?, 0, 0, if (self.vertical) 5 else self.size, if (self.vertical) self.size else 5) catch {};
+        gdip.fillRectangleI(self.graphics.?, transp_brush.?, 0, 0, if (self.vertical) 5 else width, if (self.vertical) height else 5) catch {};
     if (self.vertical)
-        gdip.drawLineI(self.graphics.?, line_pen.?, 2, 0, 2, self.size) catch {}
+        gdip.drawLineI(self.graphics.?, line_pen.?, 2, 0, 2, height) catch {}
     else
-        gdip.drawLineI(self.graphics.?, line_pen.?, 0, 2, self.size, 2) catch {};
+        gdip.drawLineI(self.graphics.?, line_pen.?, 0, 2, width, 2) catch {};
     if (!self.onMove())
         self.base.invalidate();
 }

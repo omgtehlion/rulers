@@ -4,6 +4,8 @@ const gdip = @import("gdiplus.zig");
 const Ruler = @import("ruler.zig");
 const Guide = @import("guide.zig");
 
+const WM_TRAY = win.WM_USER + 0x01;
+
 pub var control_pressed: bool = false;
 pub var running: bool = false;
 pub var rulers: std.ArrayList(*Ruler) = undefined;
@@ -16,6 +18,10 @@ var allocator: std.mem.Allocator = undefined;
 var hook: ?win.HHOOK = null;
 var v_guides: std.ArrayList(*Guide) = undefined;
 var h_guides: std.ArrayList(*Guide) = undefined;
+
+var main_window: ?win.HWND = null;
+var monitors: []win.MonitorInfo = undefined;
+var nid: win.NOTIFYICONDATAA = undefined;
 
 pub fn init(alloc: std.mem.Allocator) !void {
     allocator = alloc;
@@ -30,21 +36,50 @@ pub fn init(alloc: std.mem.Allocator) !void {
     size_h_cursor = win.LoadCursorA(null, win.IDC_SIZEWE);
     size_v_cursor = win.LoadCursorA(null, win.IDC_SIZENS);
 
-    control_pressed = false;
     hook = win.SetWindowsHookExA(win.WH_KEYBOARD_LL, lowLevelKeyboardProc, hinstance, 0);
     running = true;
 
-    // Enumerate monitors and create rulers for each
-    const monitors = try win.enumMonitors(allocator);
-    defer allocator.free(monitors);
-    var first_ruler = true;
-    for (monitors) |monitor| {
-        try rulers.append(try Ruler.create(allocator, true, first_ruler, monitor));
-        try rulers.append(try Ruler.create(allocator, false, false, monitor));
-        first_ruler = false;
-    }
-    for (rulers.items) |ruler|
-        ruler.base.show();
+    _ = win.RegisterClassA(&.{
+        .style = 0,
+        .lpfnWndProc = mainWndProc,
+        .cbClsExtra = 0,
+        .cbWndExtra = 0,
+        .hInstance = hinstance,
+        .hIcon = null,
+        .hCursor = null,
+        .hbrBackground = null,
+        .lpszMenuName = null,
+        .lpszClassName = "RulersWndCls",
+    });
+    main_window = win.CreateWindowExA(
+        0,
+        "RulersWndCls",
+        "Rulers",
+        0,
+        0,
+        0,
+        0,
+        0,
+        null,
+        null,
+        hinstance,
+        null,
+    ) orelse return error.CreateWindowFailed;
+
+    nid = std.mem.zeroInit(win.NOTIFYICONDATAA, .{
+        .cbSize = @sizeOf(win.NOTIFYICONDATAA),
+        .hWnd = main_window.?,
+        .hIcon = win.LoadIconA(hinstance, "MAINICON") orelse return,
+        .uFlags = win.NIF_ICON | win.NIF_TIP | win.NIF_MESSAGE,
+        .uCallbackMessage = WM_TRAY,
+    });
+    const tip = "Rulers";
+    @memcpy(nid.szTip[0..tip.len], tip);
+    nid.szTip[tip.len] = 0;
+    _ = win.Shell_NotifyIconA(win.NIM_ADD, &nid);
+
+    monitors = try alloc.alloc(win.MonitorInfo, 0);
+    try handleMonitorChange();
 }
 
 pub fn deinit() void {
@@ -54,6 +89,11 @@ pub fn deinit() void {
     for (rulers.items) |ruler|
         ruler.deinit();
     rulers.deinit();
+    if (main_window) |hwnd| {
+        _ = win.Shell_NotifyIconA(win.NIM_DELETE, &nid);
+        _ = win.DestroyWindow(hwnd);
+    }
+    allocator.free(monitors);
     v_guides.deinit();
     h_guides.deinit();
     gdip.shutdown();
@@ -92,11 +132,95 @@ fn lowLevelKeyboardProc(nCode: c_int, wParam: win.WPARAM, lParam: win.LPARAM) ca
     return win.CallNextHookEx(hook, nCode, wParam, lParam);
 }
 
+fn mainWndProc(hwnd: win.HWND, msg: win.UINT, wparam: win.WPARAM, lparam: win.LPARAM) callconv(.C) win.LRESULT {
+    switch (msg) {
+        win.WM_DISPLAYCHANGE => {
+            handleMonitorChange() catch {};
+            return 0;
+        },
+        WM_TRAY => {
+            switch (lparam) {
+                win.WM_LBUTTONDOWN => bringToFrontAll(),
+                win.WM_MBUTTONUP => {
+                    running = false;
+                    _ = win.PostMessageA(hwnd, WM_TRAY, 0, 0);
+                },
+                win.WM_RBUTTONDOWN => {
+                    display_mode += 1;
+                    display_mode %= 3;
+                    notifyAll();
+                },
+                else => {},
+            }
+            return 0;
+        },
+        else => return win.DefWindowProcA(hwnd, msg, wparam, lparam),
+    }
+}
+
+fn handleMonitorChange() !void {
+    const new_monitors = try win.enumMonitors(allocator);
+    defer allocator.free(new_monitors);
+    if (monitorsEqual(monitors, new_monitors))
+        return;
+    for (rulers.items) |ruler|
+        ruler.deinit();
+    rulers.clearRetainingCapacity();
+    allocator.free(monitors);
+    monitors = try allocator.dupe(win.MonitorInfo, new_monitors);
+    for (monitors) |monitor| {
+        try rulers.append(try Ruler.create(allocator, true, monitor));
+        try rulers.append(try Ruler.create(allocator, false, monitor));
+    }
+    for (rulers.items) |ruler|
+        ruler.base.show();
+    updateGuides(&v_guides);
+    updateGuides(&h_guides);
+}
+
+fn monitorsEqual(a: []const win.MonitorInfo, b: []const win.MonitorInfo) bool {
+    if (a.len != b.len) return false;
+    for (a) |ma| {
+        var found = false;
+        for (b) |mb| {
+            if (std.meta.eql(ma.rect, mb.rect) and ma.is_primary == mb.is_primary) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) return false;
+    }
+    return true;
+}
+
+fn updateGuides(guides: *std.ArrayList(*Guide)) void {
+    var i: usize = 0;
+    while (i < guides.items.len) {
+        if (!updateGuideBounds(guides.items[i]))
+            guides.swapRemove(i).deinit()
+        else
+            i += 1;
+    }
+}
+
+fn updateGuideBounds(g: *Guide) bool {
+    for (monitors) |m| {
+        const left, const top, const right, const bottom = .{ m.rect.left, m.rect.top, m.rect.right, m.rect.bottom };
+        const found = if (g.vertical)
+            g.base.left >= left and g.base.left < right and g.base.top < bottom and g.base.top + g.base.height >= top
+        else
+            g.base.top >= top and g.base.top < bottom and g.base.left < right and g.base.left + g.base.width >= left;
+        if (found) {
+            g.setBounds(m.rect) catch break;
+            return true;
+        }
+    }
+    return false;
+}
+
 pub fn addGuide(guide: *Guide) !void {
-    if (guide.vertical)
-        try v_guides.append(guide)
-    else
-        try h_guides.append(guide);
+    const guides = if (guide.vertical) &v_guides else &h_guides;
+    try guides.append(guide);
     guide.base.show();
 }
 

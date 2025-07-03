@@ -30,7 +30,7 @@ pub fn createAt(
 ) !void {
     self.* = .{ .parent = parent };
     const hinstance = win.GetModuleHandleW(null) orelse return error.OperationFailed;
-    const wc = win.WNDCLASSA{
+    _ = win.RegisterClassA(&.{
         .style = cls_style,
         .lpfnWndProc = wndProc,
         .cbClsExtra = 0,
@@ -41,8 +41,7 @@ pub fn createAt(
         .hbrBackground = null,
         .lpszMenuName = null,
         .lpszClassName = cls_name,
-    };
-    _ = win.RegisterClassA(&wc);
+    });
     self.hwnd = win.CreateWindowExA(
         dw_ex_style | win.WS_EX_LAYERED,
         cls_name,
