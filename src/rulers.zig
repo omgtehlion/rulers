@@ -6,7 +6,17 @@ const Guide = @import("guide.zig");
 const globals = @import("globals.zig");
 
 const WM_TRAY = win.WM_USER + 0x01;
-const FRAME_THICKNESS = 25;
+
+const RULER_WIDTH = 16;
+const MAJOR_TICK = 50;
+const MINOR_TICK = 5;
+const MINOR_TICK_SHORT = 4;
+const MINOR_TICK_LONG = 6;
+const FONT_SIZE = 11;
+const LABEL_Y_OFFSET = -2;
+const GUIDE_CREATION_MARGIN = 20;
+const GUIDE_CREATION_MIN = 18;
+const GUIDE_OFFSET = 7;
 
 const Self = @This();
 
@@ -71,98 +81,87 @@ fn createRulers(self: *Self) !void {
 
     const black_pen = try gdip.createPen1(gdip.makeColor(255, 0, 0, 0), 1.0, .UnitPixel);
     defer gdip.deletePen(black_pen) catch {};
-    const white_pen = try gdip.createPen1(gdip.makeColor(255, 255, 255, 255), 1.0, .UnitPixel);
-    defer gdip.deletePen(white_pen) catch {};
 
     // Create font
-    const font_family = try gdip.createFontFamilyFromName(std.unicode.utf8ToUtf16LeStringLiteral("Arial"), null);
+    const font_family = try gdip.createFontFamilyFromName(std.unicode.utf8ToUtf16LeStringLiteral("Segoe UI"), null);
     defer gdip.deleteFontFamily(font_family) catch {};
 
-    const font = try gdip.createFont(font_family, 9, .FontStyleRegular, .UnitPixel);
+    const font = try gdip.createFont(font_family, FONT_SIZE, .FontStyleRegular, .UnitPixel);
     defer gdip.deleteFont(font) catch {};
 
     // Clear background
     try gdip.graphicsClear(graphics, 0);
 
     // Draw ruler backgrounds
-    try gdip.fillRectangleI(graphics, white_brush, 0, 0, 15, self.base.height);
-    try gdip.fillRectangleI(graphics, white_brush, 0, 0, self.base.width, 15);
+    try gdip.fillRectangleI(graphics, white_brush, 0, 0, RULER_WIDTH, self.base.height);
+    try gdip.fillRectangleI(graphics, white_brush, 0, 0, self.base.width, RULER_WIDTH);
 
     // Draw ruler borders
-    try gdip.drawLineI(graphics, black_pen, 15, 16, 15, self.base.height);
-    try gdip.drawLineI(graphics, black_pen, 16, 15, self.base.width, 15);
+    try gdip.drawLineI(graphics, black_pen, RULER_WIDTH - 1, RULER_WIDTH, RULER_WIDTH - 1, self.base.height);
+    try gdip.drawLineI(graphics, black_pen, RULER_WIDTH, RULER_WIDTH - 1, self.base.width, RULER_WIDTH - 1);
+
+    var string_buffer: [1024]u8 = undefined;
+    var fba = std.heap.FixedBufferAllocator.init(&string_buffer);
+    const local_allocator = fba.allocator();
 
     // Draw vertical ruler markings
-    var i: i32 = 0;
-    while (i <= @divFloor(self.base.height, 50)) : (i += 1) {
-        const y = i * 50;
-        // Draw major tick and number
-        try gdip.drawLineI(graphics, black_pen, 0, y, 15, y);
-
-        const num_str = std.fmt.allocPrint(std.heap.page_allocator, "{}", .{i * 50}) catch continue;
-        defer std.heap.page_allocator.free(num_str);
-
+    var y: i32 = 0;
+    while (y <= self.base.height) : (y += MAJOR_TICK) {
+        // Draw major tick
+        try gdip.drawLineI(graphics, black_pen, 0, y, RULER_WIDTH - 1, y);
+        fba.reset();
+        const num_str = std.fmt.allocPrint(local_allocator, "{}", .{y}) catch continue;
         // Draw each digit vertically
-        for (num_str, 0..) |char, j| {
-            const char_str = [_]u8{ char, 0 };
-            const utf16_char = std.unicode.utf8ToUtf16LeAllocZ(std.heap.page_allocator, char_str[0..1]) catch continue;
-            defer std.heap.page_allocator.free(utf16_char);
-
+        var digit_y = y - FONT_SIZE + LABEL_Y_OFFSET;
+        for (num_str) |char| {
             gdip.drawString(
                 graphics,
-                utf16_char,
+                &[_:0]u16{ char, 0 },
                 -1,
                 font,
-                &gdip.makeRect(0, @floatFromInt(y + @as(i32, @intCast(j)) * 9 - 8), 15, 12),
+                &gdip.makeRect(0, @floatFromInt(digit_y), RULER_WIDTH - 1, FONT_SIZE * 1.5),
                 null,
                 black_brush,
             ) catch {};
+            digit_y += FONT_SIZE;
         }
     }
 
     // Draw vertical minor ticks
-    i = 0;
-    while (i <= @divFloor(self.base.height, 5)) : (i += 1) {
-        const y = i * 5;
-        const x: c_int = if (@mod(i, 2) == 1) 11 else 9;
-        try gdip.drawLineI(graphics, black_pen, x, y, 15, y);
+    y = 0;
+    while (y <= self.base.height) : (y += MINOR_TICK) {
+        const l: c_int = if (@mod(@divTrunc(y, MINOR_TICK), 2) == 1) MINOR_TICK_LONG else MINOR_TICK_SHORT;
+        try gdip.drawLineI(graphics, black_pen, RULER_WIDTH - l, y, RULER_WIDTH - 1, y);
     }
 
     // Draw horizontal ruler markings
-    i = 0;
-    while (i <= @divFloor(self.base.width, 50)) : (i += 1) {
-        const x = i * 50;
-
-        // Draw major tick and number
-        try gdip.drawLineI(graphics, black_pen, x, 0, x, 15);
-
-        const num_str = std.fmt.allocPrint(std.heap.page_allocator, "{}", .{i * 50}) catch continue;
-        defer std.heap.page_allocator.free(num_str);
-
-        const utf16_str = std.unicode.utf8ToUtf16LeAllocZ(std.heap.page_allocator, num_str) catch continue;
-        defer std.heap.page_allocator.free(utf16_str);
-
+    var x: i32 = 0;
+    while (x <= self.base.width) : (x += MAJOR_TICK) {
+        // Draw major tick
+        try gdip.drawLineI(graphics, black_pen, x, 0, x, RULER_WIDTH - 1);
+        fba.reset();
+        const num_str = std.fmt.allocPrint(local_allocator, "{}", .{x}) catch continue;
+        const utf16_str = std.unicode.utf8ToUtf16LeAllocZ(local_allocator, num_str) catch continue;
         gdip.drawString(
             graphics,
             utf16_str,
             -1,
             font,
-            &gdip.makeRect(@floatFromInt(x), 0, 50, 15),
+            &gdip.makeRect(@floatFromInt(x), LABEL_Y_OFFSET, MAJOR_TICK, RULER_WIDTH - 1),
             null,
             black_brush,
         ) catch {};
     }
 
     // Draw horizontal minor ticks
-    i = 0;
-    while (i <= @divFloor(self.base.width, 5)) : (i += 1) {
-        const x = i * 5;
-        const y: c_int = if (@mod(i, 2) == 1) 11 else 9;
-        try gdip.drawLineI(graphics, black_pen, x, y, x, 15);
+    x = 0;
+    while (x <= self.base.width) : (x += MINOR_TICK) {
+        const l: c_int = if (@mod(@divTrunc(x, MINOR_TICK), 2) == 1) MINOR_TICK_LONG else MINOR_TICK_SHORT;
+        try gdip.drawLineI(graphics, black_pen, x, RULER_WIDTH - l, x, RULER_WIDTH - 1);
     }
 
     // Draw corner square
-    try gdip.fillRectangleI(graphics, white_brush, 0, 0, 16, 16);
+    try gdip.fillRectangleI(graphics, white_brush, 0, 0, RULER_WIDTH, RULER_WIDTH);
 
     self.base.redraw();
     self.base.invalidate();
@@ -185,14 +184,14 @@ fn setupTray(self: *Self) void {
 
 fn createNew(self: *Self) void {
     const p = win.getCursorPos() catch return;
-    if (p.x < 20 and p.y > 18) {
+    if (p.x < GUIDE_CREATION_MARGIN and p.y > GUIDE_CREATION_MIN) {
         _ = win.SetCursor(globals.size_h_cursor);
         self.current_guide = Guide.create(self.allocator, true, self.base.height) catch return;
-        self.current_guide.?.move(p.x - 7);
-    } else if (p.y < 20 and p.x > 18) {
+        self.current_guide.?.move(p.x - GUIDE_OFFSET);
+    } else if (p.y < GUIDE_CREATION_MARGIN and p.x > GUIDE_CREATION_MIN) {
         _ = win.SetCursor(globals.size_v_cursor);
         self.current_guide = Guide.create(self.allocator, false, self.base.width) catch return;
-        self.current_guide.?.move(p.y - 7);
+        self.current_guide.?.move(p.y - GUIDE_OFFSET);
     }
 }
 
@@ -215,10 +214,12 @@ fn processMsg(base: *AlphaWnd, msg: win.UINT, wparam: win.WPARAM, lparam: win.LP
             const rect: *win.RECT = @ptrFromInt(@as(usize, @bitCast(lparam)));
             if (self.current_guide) |guide|
                 guide.move(if (guide.vertical) rect.left + guide.base.left else rect.top + guide.base.top);
-            rect.top = self.base.top;
-            rect.bottom = self.base.top + self.base.height;
-            rect.left = self.base.left;
-            rect.right = self.base.left + self.base.width;
+            rect.* = .{
+                .top = self.base.top,
+                .bottom = self.base.top + self.base.height,
+                .left = self.base.left,
+                .right = self.base.left + self.base.width,
+            };
             return 0;
         },
         win.WM_CLOSE, win.WM_NCMBUTTONUP => {

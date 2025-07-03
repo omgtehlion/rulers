@@ -125,52 +125,23 @@ fn onMove(self: *Self) bool {
 fn doDraw(self: *Self, rect: gdip.Rect, val: i32) void {
     gdip.setClipRectI(self.graphics.?, rect.X, rect.Y, rect.Width, rect.Height, .CombineModeReplace) catch return;
     gdip.graphicsClear(self.graphics.?, coord_under_color) catch return;
-
-    if (globals.display_mode == 1) {
-        const val_str = std.fmt.allocPrint(std.heap.page_allocator, "{}", .{val + 2}) catch return;
-        defer std.heap.page_allocator.free(val_str);
-
-        const utf16_str = std.unicode.utf8ToUtf16LeAllocZ(std.heap.page_allocator, val_str) catch return;
-        defer std.heap.page_allocator.free(utf16_str);
-
-        gdip.drawString(
-            self.graphics.?,
-            utf16_str,
-            -1,
-            coord_font.?,
-            &gdip.makeRect(@floatFromInt(rect.X), @floatFromInt(rect.Y - 1), @floatFromInt(rect.Width), @floatFromInt(rect.Height)),
-            null,
-            coord_brush.?,
-        ) catch {};
-    } else if (globals.display_mode == 2) {
-        const plus_str = std.unicode.utf8ToUtf16LeStringLiteral("+");
-        gdip.drawString(
-            self.graphics.?,
-            plus_str,
-            -1,
-            coord_font.?,
-            &gdip.makeRect(@floatFromInt(rect.X), @floatFromInt(rect.Y - 1), @floatFromInt(rect.Width), @floatFromInt(rect.Height)),
-            null,
-            coord_brush.?,
-        ) catch {};
-
-        const dist_str = std.fmt.allocPrint(std.heap.page_allocator, "{}", .{val - self.distance}) catch return;
-        defer std.heap.page_allocator.free(dist_str);
-
-        const utf16_dist_str = std.unicode.utf8ToUtf16LeAllocZ(std.heap.page_allocator, dist_str) catch return;
-        defer std.heap.page_allocator.free(utf16_dist_str);
-
-        gdip.drawString(
-            self.graphics.?,
-            utf16_dist_str,
-            -1,
-            coord_font.?,
-            &gdip.makeRect(@floatFromInt(rect.X + self.plus_dist), @floatFromInt(rect.Y - 1), @floatFromInt(rect.Width), @floatFromInt(rect.Height)),
-            null,
-            coord_brush.?,
-        ) catch {};
-    }
-
+    var buffer: [1024]u8 = undefined;
+    var fba = std.heap.FixedBufferAllocator.init(&buffer);
+    const local_allocator = fba.allocator();
+    const text_str = switch (globals.display_mode) {
+        1 => std.fmt.allocPrint(local_allocator, "{}", .{val + 2}) catch return,
+        2 => std.fmt.allocPrint(local_allocator, "+{}", .{val - self.distance}) catch return,
+        else => return,
+    };
+    gdip.drawString(
+        self.graphics.?,
+        std.unicode.utf8ToUtf16LeAllocZ(local_allocator, text_str) catch return,
+        -1,
+        coord_font.?,
+        &gdip.makeRect(@floatFromInt(rect.X), @floatFromInt(rect.Y - 1), @floatFromInt(rect.Width), @floatFromInt(rect.Height)),
+        null,
+        coord_brush.?,
+    ) catch {};
     gdip.resetClip(self.graphics.?) catch {};
 }
 
