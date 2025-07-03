@@ -1,7 +1,7 @@
 const std = @import("std");
 const win = @import("windows.zig");
 const gdip = @import("gdiplus.zig");
-const Ruler = @import("rulers.zig");
+const Ruler = @import("ruler.zig");
 const Guide = @import("guide.zig");
 
 pub var control_pressed: bool = false;
