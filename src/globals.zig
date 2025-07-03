@@ -1,12 +1,12 @@
 const std = @import("std");
 const win = @import("windows.zig");
 const gdip = @import("gdiplus.zig");
-const Rulers = @import("rulers.zig");
+const Ruler = @import("rulers.zig");
 const Guide = @import("guide.zig");
 
 pub var control_pressed: bool = false;
 pub var running: bool = false;
-pub var main_wnd: ?*Rulers = null;
+pub var rulers: std.ArrayList(*Ruler) = undefined;
 pub var display_mode: u32 = 0;
 
 pub var size_h_cursor: ?win.HCURSOR = null;
@@ -21,6 +21,7 @@ pub fn init(alloc: std.mem.Allocator) !void {
     allocator = alloc;
     v_guides = std.ArrayList(*Guide).init(allocator);
     h_guides = std.ArrayList(*Guide).init(allocator);
+    rulers = std.ArrayList(*Ruler).init(allocator);
 
     try gdip.startup();
 
@@ -33,16 +34,26 @@ pub fn init(alloc: std.mem.Allocator) !void {
     hook = win.SetWindowsHookExA(win.WH_KEYBOARD_LL, lowLevelKeyboardProc, hinstance, 0);
     running = true;
 
-    main_wnd = try Rulers.create(allocator);
-    main_wnd.?.base.show();
+    // Enumerate monitors and create rulers for each
+    const monitors = try win.enumMonitors(allocator);
+    defer allocator.free(monitors);
+    var first_ruler = true;
+    for (monitors) |monitor| {
+        try rulers.append(try Ruler.create(allocator, true, first_ruler, monitor));
+        try rulers.append(try Ruler.create(allocator, false, false, monitor));
+        first_ruler = false;
+    }
+    for (rulers.items) |ruler|
+        ruler.base.show();
 }
 
 pub fn deinit() void {
     if (hook) |h|
         _ = win.UnhookWindowsHookEx(h);
     removeAllGuides();
-    if (main_wnd) |wnd|
-        wnd.deinit();
+    for (rulers.items) |ruler|
+        ruler.deinit();
+    rulers.deinit();
     v_guides.deinit();
     h_guides.deinit();
     gdip.shutdown();
@@ -114,8 +125,8 @@ pub fn bringToFrontAll() void {
         _ = win.SetForegroundWindow(guide.base.hwnd.?);
     for (h_guides.items) |guide|
         _ = win.SetForegroundWindow(guide.base.hwnd.?);
-    if (main_wnd) |wnd|
-        _ = win.SetForegroundWindow(wnd.base.hwnd.?);
+    for (rulers.items) |ruler|
+        _ = win.SetForegroundWindow(ruler.base.hwnd.?);
 }
 
 pub fn notifyAll() void {
@@ -136,10 +147,16 @@ pub fn getDistance(guide: *Guide) i32 {
     var result: i32 = -2;
     const guides = if (guide.vertical) &v_guides else &h_guides;
     for (guides.items) |g| {
+        if (!guidesOnSameMonitor(guide, g)) continue;
         const pos = if (guide.vertical) g.base.left else g.base.top;
         const guide_pos = if (guide.vertical) guide.base.left else guide.base.top;
         if (pos < guide_pos and pos > result)
             result = pos;
     }
     return result;
+}
+
+fn guidesOnSameMonitor(guide1: *Guide, guide2: *Guide) bool {
+    return guide1.bounds.left == guide2.bounds.left and
+        guide1.bounds.top == guide2.bounds.top;
 }

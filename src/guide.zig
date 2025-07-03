@@ -11,7 +11,7 @@ graphics: ?*gdip.Graphics = null,
 vertical: bool,
 size: i32,
 distance: i32 = 0,
-plus_dist: i32 = 0,
+bounds: win.RECT,
 allocator: std.mem.Allocator,
 
 // Static brushes and pens (initialized once)
@@ -22,13 +22,20 @@ var coord_under_color: gdip.Color = 0;
 var line_pen: ?*gdip.Pen = null;
 var initialized: bool = false;
 
-pub fn create(allocator: std.mem.Allocator, is_vertical: bool, guide_size: i32) !*Self {
+pub fn create(allocator: std.mem.Allocator, is_vertical: bool, bounds: win.RECT) !*Self {
     if (!initialized) {
         try initializeStatics();
         initialized = true;
     }
     const self = try allocator.create(Self);
-    self.* = Self{ .base = undefined, .vertical = is_vertical, .size = guide_size, .allocator = allocator };
+    self.* = Self{
+        .base = undefined,
+        .vertical = is_vertical,
+        .size = if (is_vertical) bounds.bottom - bounds.top else bounds.right - bounds.left,
+        .allocator = allocator,
+        .bounds = bounds,
+    };
+
     try AlphaWnd.createAt(
         &self.base,
         win.CS_DBLCLKS,
@@ -43,37 +50,21 @@ pub fn create(allocator: std.mem.Allocator, is_vertical: bool, guide_size: i32) 
     self.base.processMsg = processMsg;
     if (is_vertical) {
         self.base.width = 50;
-        self.base.height = guide_size;
+        self.base.height = self.size;
     } else {
-        self.base.width = guide_size;
+        self.base.width = self.size;
         self.base.height = 50;
     }
-    self.base.left = 0;
-    self.base.top = 0;
-
+    self.base.left = bounds.left;
+    self.base.top = bounds.top;
     // Create bitmap and graphics
     self.base.bitmap = try gdip.createBitmapFromScan0(self.base.width, self.base.height, 0, gdip.PixelFormat32bppARGB, null);
     self.graphics = try gdip.createGraphicsFromImage(@ptrCast(self.base.bitmap.?));
     try gdip.setTextRenderingHint(self.graphics.?, .TextRenderingHintAntiAliasGridFit);
-
-    // Calculate plus distance
-    const plus_str = std.unicode.utf8ToUtf16LeStringLiteral("+");
-    const bounds = try gdip.measureString(
-        self.graphics.?,
-        plus_str,
-        -1,
-        coord_font.?,
-        &gdip.makeRect(0, 0, 100, 100),
-        null,
-    );
-    self.plus_dist = @intFromFloat(@ceil(bounds.Width));
-
     self.repaint();
     self.base.redraw();
-
     try globals.addGuide(self);
     self.notify();
-
     return self;
 }
 
@@ -168,7 +159,11 @@ fn processMsg(base: *AlphaWnd, msg: win.UINT, wparam: win.WPARAM, lparam: win.LP
             return 0;
         },
         win.WM_EXITSIZEMOVE => {
-            if ((self.base.left < 5 and self.vertical) or (self.base.top < 5 and !self.vertical)) {
+            const should_remove = if (self.vertical)
+                self.base.left < self.bounds.left + 5
+            else
+                self.base.top < self.bounds.top + 5;
+            if (should_remove) {
                 globals.removeGuide(self);
                 return 0;
             }

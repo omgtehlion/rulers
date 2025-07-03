@@ -84,6 +84,13 @@ pub const NOTIFYICONDATAA = extern struct {
     szInfoTitle: [64]u8,
     dwInfoFlags: DWORD,
 };
+pub const MONITORINFO = extern struct {
+    cbSize: DWORD,
+    rcMonitor: RECT,
+    rcWork: RECT,
+    dwFlags: DWORD,
+};
+pub const HMONITOR = *opaque {};
 
 pub const WM_CREATE = 0x0001;
 pub const WM_DESTROY = 0x0002;
@@ -150,6 +157,8 @@ pub const IDC_ARROW = @as([*:0]const u8, @ptrFromInt(32512));
 pub const IDC_SIZEWE = @as([*:0]const u8, @ptrFromInt(32644));
 pub const IDC_SIZENS = @as([*:0]const u8, @ptrFromInt(32645));
 
+pub const MONITORINFOF_PRIMARY = 0x00000001;
+
 pub extern "user32" fn RegisterClassA(lpWndClass: *const WNDCLASSA) callconv(.C) c_ushort;
 pub extern "user32" fn CreateWindowExA(dwExStyle: DWORD, lpClassName: [*:0]const u8, lpWindowName: [*:0]const u8, dwStyle: DWORD, X: c_int, Y: c_int, nWidth: c_int, nHeight: c_int, hWndParent: ?HWND, hMenu: ?HMENU, hInstance: w.HMODULE, lpParam: ?*anyopaque) callconv(.C) ?HWND;
 pub extern "user32" fn DestroyWindow(hWnd: HWND) BOOL;
@@ -179,6 +188,8 @@ pub extern "user32" fn WaitMessage() callconv(.C) BOOL;
 pub extern "user32" fn SetWindowsHookExA(idHook: c_int, lpfn: *const fn (c_int, WPARAM, LPARAM) callconv(.C) LRESULT, hMod: w.HMODULE, dwThreadId: DWORD) callconv(.C) ?HHOOK;
 pub extern "user32" fn UnhookWindowsHookEx(hhk: HHOOK) callconv(.C) BOOL;
 pub extern "user32" fn CallNextHookEx(hhk: ?HHOOK, nCode: c_int, wParam: WPARAM, lParam: LPARAM) callconv(.C) LRESULT;
+pub extern "user32" fn EnumDisplayMonitors(hdc: ?HDC, lprcClip: ?*RECT, lpfnEnum: *const fn (HMONITOR, HDC, *RECT, LPARAM) callconv(.C) BOOL, dwData: LPARAM) callconv(.C) BOOL;
+pub extern "user32" fn GetMonitorInfoA(hMonitor: HMONITOR, lpmi: *MONITORINFO) callconv(.C) BOOL;
 pub extern "gdi32" fn CreateCompatibleDC(hdc: ?HDC) callconv(.C) ?HDC;
 pub extern "gdi32" fn DeleteDC(hdc: HDC) callconv(.C) BOOL;
 pub extern "gdi32" fn SelectObject(hdc: HDC, h: ?*anyopaque) callconv(.C) ?*anyopaque;
@@ -199,4 +210,30 @@ pub fn getWindowRect(hwnd: HWND) !RECT {
     if (GetWindowRect(hwnd, &rect) == 0)
         return error.OperationFailed;
     return rect;
+}
+
+pub const MonitorInfo = struct {
+    rect: RECT,
+    work_rect: RECT,
+    is_primary: bool,
+};
+
+pub fn enumMonitors(allocator: std.mem.Allocator) ![]MonitorInfo {
+    var monitors = std.ArrayList(MonitorInfo).init(allocator);
+    const EnumContext = struct {
+        fn enumProc(hMonitor: HMONITOR, hdc: HDC, lprcMonitor: *RECT, dwData: LPARAM) callconv(.C) BOOL {
+            _ = hdc;
+            _ = lprcMonitor;
+            const m: *std.ArrayList(MonitorInfo) = @ptrFromInt(@as(usize, @bitCast(dwData)));
+            var mi = MONITORINFO{ .cbSize = @sizeOf(MONITORINFO), .rcMonitor = undefined, .rcWork = undefined, .dwFlags = 0 };
+            if (GetMonitorInfoA(hMonitor, &mi) != 0)
+                m.append(.{ .rect = mi.rcMonitor, .work_rect = mi.rcWork, .is_primary = (mi.dwFlags & MONITORINFOF_PRIMARY) != 0 }) catch return 0;
+            return 1; // Continue enumeration
+        }
+    };
+    if (EnumDisplayMonitors(null, null, EnumContext.enumProc, @bitCast(@intFromPtr(&monitors))) == 0) {
+        monitors.deinit();
+        return error.OperationFailed;
+    }
+    return monitors.toOwnedSlice();
 }
