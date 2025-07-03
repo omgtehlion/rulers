@@ -22,6 +22,14 @@ var h_guides: std.ArrayList(*Guide) = undefined;
 var main_window: ?win.HWND = null;
 var monitors: []win.MonitorInfo = undefined;
 var nid: win.NOTIFYICONDATAA = undefined;
+var tray_menu: ?win.HMENU = null;
+
+// Menu item IDs
+pub const ID_MODE_NO = 1001;
+pub const ID_MODE_ABS = 1002;
+pub const ID_MODE_REL = 1003;
+pub const ID_CLEAR_GUIDES = 1004;
+pub const ID_EXIT = 1005;
 
 pub fn init(alloc: std.mem.Allocator) !void {
     allocator = alloc;
@@ -66,6 +74,7 @@ pub fn init(alloc: std.mem.Allocator) !void {
         null,
     ) orelse return error.CreateWindowFailed;
 
+    tray_menu = try createTrayMenu();
     nid = std.mem.zeroInit(win.NOTIFYICONDATAA, .{
         .cbSize = @sizeOf(win.NOTIFYICONDATAA),
         .hWnd = main_window.?,
@@ -89,6 +98,8 @@ pub fn deinit() void {
     for (rulers.items) |ruler|
         ruler.deinit();
     rulers.deinit();
+    if (tray_menu) |menu|
+        _ = win.DestroyMenu(menu);
     if (main_window) |hwnd| {
         _ = win.Shell_NotifyIconA(win.NIM_DELETE, &nid);
         _ = win.DestroyWindow(hwnd);
@@ -142,6 +153,19 @@ fn mainWndProc(hwnd: win.HWND, msg: win.UINT, wparam: win.WPARAM, lparam: win.LP
             handleMonitorChange() catch {};
             return 0;
         },
+        win.WM_COMMAND => {
+            const cmd_id = @as(u16, @truncate(wparam & 0xFFFF));
+            switch (cmd_id) {
+                ID_MODE_NO => display_mode = 0,
+                ID_MODE_ABS => display_mode = 1,
+                ID_MODE_REL => display_mode = 2,
+                ID_CLEAR_GUIDES => removeAllGuides(),
+                ID_EXIT => running = false,
+                else => {},
+            }
+            notifyAll();
+            return 0;
+        },
         WM_TRAY => {
             switch (lparam) {
                 win.WM_LBUTTONDOWN => bringToFrontAll(),
@@ -149,11 +173,7 @@ fn mainWndProc(hwnd: win.HWND, msg: win.UINT, wparam: win.WPARAM, lparam: win.LP
                     running = false;
                     _ = win.PostMessageA(hwnd, WM_TRAY, 0, 0);
                 },
-                win.WM_RBUTTONDOWN => {
-                    display_mode += 1;
-                    display_mode %= 3;
-                    notifyAll();
-                },
+                win.WM_RBUTTONDOWN => showPopupMenu(),
                 else => {},
             }
             return 0;
@@ -287,4 +307,38 @@ pub fn getDistance(guide: *Guide) i32 {
 fn guidesOnSameMonitor(guide1: *Guide, guide2: *Guide) bool {
     return guide1.bounds.left == guide2.bounds.left and
         guide1.bounds.top == guide2.bounds.top;
+}
+
+fn createTrayMenu() !win.HMENU {
+    const menu = win.CreatePopupMenu() orelse return error.CreateMenuFailed;
+    _ = win.AppendMenuA(menu, win.MF_STRING, ID_MODE_NO, "No position");
+    _ = win.AppendMenuA(menu, win.MF_STRING, ID_MODE_ABS, "Absolute position");
+    _ = win.AppendMenuA(menu, win.MF_STRING, ID_MODE_REL, "Relative position");
+    _ = win.AppendMenuA(menu, win.MF_SEPARATOR, 0, null);
+    _ = win.AppendMenuA(menu, win.MF_STRING, ID_CLEAR_GUIDES, "Clear all guides");
+    _ = win.AppendMenuA(menu, win.MF_SEPARATOR, 0, null);
+    _ = win.AppendMenuA(menu, win.MF_STRING, ID_EXIT, "Exit");
+    return menu;
+}
+
+pub fn showPopupMenu() void {
+    const cursor_pos = win.getCursorPos() catch return;
+    if (tray_menu) |menu| {
+        var mii = std.mem.zeroInit(win.MENUITEMINFOA, .{
+            .cbSize = @sizeOf(win.MENUITEMINFOA),
+            .fMask = win.MIIM_FTYPE | win.MIIM_STATE,
+            .fType = win.MFT_RADIOCHECK,
+        });
+        mii.fState = if (display_mode == 0) win.MFS_CHECKED else win.MFS_UNCHECKED;
+        _ = win.SetMenuItemInfoA(menu, ID_MODE_NO, 0, &mii);
+        mii.fState = if (display_mode == 1) win.MFS_CHECKED else win.MFS_UNCHECKED;
+        _ = win.SetMenuItemInfoA(menu, ID_MODE_ABS, 0, &mii);
+        mii.fState = if (display_mode == 2) win.MFS_CHECKED else win.MFS_UNCHECKED;
+        _ = win.SetMenuItemInfoA(menu, ID_MODE_REL, 0, &mii);
+
+        const hwnd = main_window.?;
+        _ = win.SetForegroundWindow(hwnd); // Required for proper menu behavior
+        _ = win.TrackPopupMenu(menu, 0, cursor_pos.x, cursor_pos.y, 0, hwnd, null);
+        _ = win.PostMessageA(hwnd, win.WM_NULL, 0, 0); // Post a message to ensure the menu closes properly
+    }
 }

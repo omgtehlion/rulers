@@ -92,12 +92,29 @@ pub const MONITORINFO = extern struct {
 };
 pub const HMONITOR = *opaque {};
 
+pub const MENUITEMINFOA = extern struct {
+    cbSize: UINT,
+    fMask: UINT,
+    fType: UINT,
+    fState: UINT,
+    wID: UINT,
+    hSubMenu: ?HMENU,
+    hbmpChecked: ?HBITMAP,
+    hbmpUnchecked: ?HBITMAP,
+    dwItemData: ULONG_PTR,
+    dwTypeData: ?[*:0]u8,
+    cch: UINT,
+    hbmpItem: ?HBITMAP,
+};
+
+pub const WM_NULL = 0x0000;
 pub const WM_CREATE = 0x0001;
 pub const WM_DESTROY = 0x0002;
 pub const WM_MOVE = 0x0003;
 pub const WM_SIZE = 0x0005;
 pub const WM_CLOSE = 0x0010;
 pub const WM_QUIT = 0x0012;
+pub const WM_COMMAND = 0x0111;
 pub const WM_KEYDOWN = 0x0100;
 pub const WM_KEYUP = 0x0101;
 pub const WM_MOUSEMOVE = 0x0200;
@@ -160,6 +177,22 @@ pub const IDC_SIZENS = @as([*:0]const u8, @ptrFromInt(32645));
 
 pub const MONITORINFOF_PRIMARY = 0x00000001;
 
+pub const MF_STRING = 0x00000000;
+pub const MF_GRAYED = 0x00000001;
+pub const MF_SEPARATOR = 0x00000800;
+pub const MF_CHECKED = 0x00000008;
+pub const MF_UNCHECKED = 0x00000000;
+pub const MFT_RADIOCHECK = 0x00000200;
+pub const MFS_CHECKED = 0x00000008;
+pub const MFS_UNCHECKED = 0x00000000;
+pub const MIIM_TYPE = 0x00000010;
+pub const MIIM_STATE = 0x00000001;
+pub const MIIM_ID = 0x00000002;
+pub const MIIM_STRING = 0x00000040;
+pub const MIIM_FTYPE = 0x00000100;
+pub const TPM_RIGHTBUTTON = 0x0002;
+pub const TPM_RETURNCMD = 0x0100;
+
 pub extern "user32" fn RegisterClassA(lpWndClass: *const WNDCLASSA) callconv(.C) c_ushort;
 pub extern "user32" fn CreateWindowExA(dwExStyle: DWORD, lpClassName: [*:0]const u8, lpWindowName: [*:0]const u8, dwStyle: DWORD, X: c_int, Y: c_int, nWidth: c_int, nHeight: c_int, hWndParent: ?HWND, hMenu: ?HMENU, hInstance: w.HMODULE, lpParam: ?*anyopaque) callconv(.C) ?HWND;
 pub extern "user32" fn DestroyWindow(hWnd: HWND) BOOL;
@@ -191,6 +224,12 @@ pub extern "user32" fn UnhookWindowsHookEx(hhk: HHOOK) callconv(.C) BOOL;
 pub extern "user32" fn CallNextHookEx(hhk: ?HHOOK, nCode: c_int, wParam: WPARAM, lParam: LPARAM) callconv(.C) LRESULT;
 pub extern "user32" fn EnumDisplayMonitors(hdc: ?HDC, lprcClip: ?*RECT, lpfnEnum: *const fn (HMONITOR, HDC, *RECT, LPARAM) callconv(.C) BOOL, dwData: LPARAM) callconv(.C) BOOL;
 pub extern "user32" fn GetMonitorInfoA(hMonitor: HMONITOR, lpmi: *MONITORINFO) callconv(.C) BOOL;
+pub extern "user32" fn CreatePopupMenu() callconv(.C) ?HMENU;
+pub extern "user32" fn AppendMenuA(hMenu: HMENU, uFlags: UINT, uIDNewItem: ULONG_PTR, lpNewItem: ?[*:0]const u8) callconv(.C) BOOL;
+pub extern "user32" fn InsertMenuItemA(hmenu: HMENU, item: UINT, fByPosition: BOOL, lpmi: *const MENUITEMINFOA) callconv(.C) BOOL;
+pub extern "user32" fn SetMenuItemInfoA(hmenu: HMENU, item: UINT, fByPosition: BOOL, lpmii: *const MENUITEMINFOA) callconv(.C) BOOL;
+pub extern "user32" fn TrackPopupMenu(hMenu: HMENU, uFlags: UINT, x: c_int, y: c_int, nReserved: c_int, hWnd: HWND, prcRect: ?*const RECT) callconv(.C) BOOL;
+pub extern "user32" fn DestroyMenu(hMenu: HMENU) callconv(.C) BOOL;
 pub extern "gdi32" fn CreateCompatibleDC(hdc: ?HDC) callconv(.C) ?HDC;
 pub extern "gdi32" fn DeleteDC(hdc: HDC) callconv(.C) BOOL;
 pub extern "gdi32" fn SelectObject(hdc: HDC, h: ?*anyopaque) callconv(.C) ?*anyopaque;

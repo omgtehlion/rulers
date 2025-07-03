@@ -216,7 +216,9 @@ fn processMsg(base: *AlphaWnd, msg: win.UINT, wparam: win.WPARAM, lparam: win.LP
         },
         win.WM_NCRBUTTONDOWN => {
             if (globals.control_pressed)
-                globals.removeAllGuides();
+                globals.removeAllGuides()
+            else
+                globals.showPopupMenu();
             return 0;
         },
         win.WM_SETCURSOR => {
