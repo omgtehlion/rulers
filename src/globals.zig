@@ -106,6 +106,10 @@ pub fn run() !void {
     }
 }
 
+pub fn getMonitors() []const win.MonitorInfo {
+    return monitors;
+}
+
 fn processMessage() bool {
     var msg: win.MSG = undefined;
     if (win.PeekMessageA(&msg, null, 0, 0, win.PM_REMOVE) != 0) {
