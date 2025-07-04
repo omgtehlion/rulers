@@ -203,7 +203,7 @@ pub extern "user32" fn TranslateMessage(lpMsg: *const MSG) callconv(.C) BOOL;
 pub extern "user32" fn DispatchMessageA(lpMsg: *const MSG) callconv(.C) LRESULT;
 pub extern "user32" fn PostQuitMessage(nExitCode: c_int) callconv(.C) void;
 pub extern "user32" fn ShowWindow(hWnd: HWND, nCmdShow: c_int) callconv(.C) BOOL;
-pub extern "user32" fn UpdateLayeredWindow(hWnd: HWND, hdcDst: ?HDC, pptDst: ?*POINT, psize: ?*SIZE, hdcSrc: HDC, pptSrc: ?*POINT, crKey: DWORD, pblend: ?*BLENDFUNCTION, dwFlags: DWORD) callconv(.C) BOOL;
+pub extern "user32" fn UpdateLayeredWindow(hWnd: HWND, hdcDst: ?HDC, pptDst: ?*const POINT, psize: ?*const SIZE, hdcSrc: HDC, pptSrc: ?*const POINT, crKey: DWORD, pblend: ?*const BLENDFUNCTION, dwFlags: DWORD) callconv(.C) BOOL;
 pub extern "user32" fn GetDC(hWnd: ?HWND) callconv(.C) ?HDC;
 pub extern "user32" fn ReleaseDC(hWnd: ?HWND, hDC: HDC) callconv(.C) c_int;
 pub extern "user32" fn GetDesktopWindow() callconv(.C) HWND;

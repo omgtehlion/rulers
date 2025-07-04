@@ -52,34 +52,23 @@ pub fn deinit(self: *Self) void {
 }
 
 fn createRuler(self: *Self) !void {
-    self.base.bitmap = try gdip.createBitmapFromScan0(
-        self.base.width,
-        self.base.height,
-        0,
-        gdip.PixelFormat32bppARGB,
-        null,
-    );
+    self.base.bitmap = try gdip.createBitmapFromScan0(self.base.width, self.base.height, 0, gdip.PixelFormat32bppARGB, null);
     defer gdip.disposeImage(@ptrCast(self.base.bitmap.?)) catch {};
-
     const graphics = try gdip.createGraphicsFromImage(@ptrCast(self.base.bitmap.?));
     defer gdip.deleteGraphics(graphics) catch {};
-
     try gdip.setTextRenderingHint(graphics, .TextRenderingHintSystemDefault);
 
     // Create brushes and pens
     const white_brush = try gdip.createSolidFill(gdip.makeColor(255, 255, 255, 255));
     defer gdip.deleteBrush(white_brush) catch {};
-
     const black_brush = try gdip.createSolidFill(gdip.makeColor(255, 0, 0, 0));
     defer gdip.deleteBrush(black_brush) catch {};
-
     const black_pen = try gdip.createPen1(gdip.makeColor(255, 0, 0, 0), 1.0, .UnitPixel);
     defer gdip.deletePen(black_pen) catch {};
 
     // Create font
     const font_family = try gdip.createFontFamilyFromName(std.unicode.utf8ToUtf16LeStringLiteral("Segoe UI"), null);
     defer gdip.deleteFontFamily(font_family) catch {};
-
     const font = try gdip.createFont(font_family, FONT_SIZE, .FontStyleRegular, .UnitPixel);
     defer gdip.deleteFont(font) catch {};
 
@@ -202,12 +191,7 @@ fn processMsg(base: *AlphaWnd, msg: win.UINT, wparam: win.WPARAM, lparam: win.LP
                 const guide_pos = (if (guide.vertical) cursor_pos.x else cursor_pos.y);
                 guide.move(guide_pos - 2);
             }
-            rect.* = .{
-                .top = self.base.top,
-                .bottom = self.base.top + self.base.height,
-                .left = self.base.left,
-                .right = self.base.left + self.base.width,
-            };
+            rect.* = .{ .top = base.top, .bottom = base.top + base.height, .left = base.left, .right = base.left + base.width };
             return 0;
         },
         win.WM_CLOSE, win.WM_NCMBUTTONUP => {

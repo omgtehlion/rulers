@@ -106,18 +106,15 @@ pub fn invalidate(self: *Self) void {
     defer _ = win.DeleteDC(bmp_dc);
     const old_bmp = win.SelectObject(bmp_dc, hbitmap);
     defer _ = win.SelectObject(bmp_dc, old_bmp);
-    const pt = win.POINT{ .x = self.left, .y = self.top };
-    const sz = win.SIZE{ .cx = self.width, .cy = self.height };
-    const pt_src = win.POINT{ .x = 0, .y = 0 };
     _ = win.UpdateLayeredWindow(
         self.hwnd.?,
         self.hdc,
-        @constCast(&pt),
-        @constCast(&sz),
+        &.{ .x = self.left, .y = self.top },
+        &.{ .cx = self.width, .cy = self.height },
         bmp_dc,
-        @constCast(&pt_src),
+        &.{ .x = 0, .y = 0 },
         0,
-        @constCast(&self.blend_func),
+        &self.blend_func,
         win.ULW_ALPHA,
     );
 }
