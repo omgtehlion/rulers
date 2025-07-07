@@ -212,3 +212,8 @@ fn processMsg(base: *AlphaWnd, msg: win.UINT, wparam: win.WPARAM, lparam: win.LP
         else => return null,
     }
 }
+
+pub fn bringToFront(self: *Self) void {
+    self.base.bringToFront(-1);
+    self.base.bringToFront(-2);
+}

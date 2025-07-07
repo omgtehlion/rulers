@@ -133,6 +133,10 @@ pub fn move(self: *Self, left: ?i32, top: ?i32) void {
     _ = win.SetWindowPos(self.hwnd.?, null, self.left, self.top, self.width, self.height, win.SWP_NOZORDER | win.SWP_NOSIZE | win.SWP_NOACTIVATE);
 }
 
+pub fn bringToFront(self: *Self, afterHwnd: isize) void {
+    _ = win.SetWindowPos(self.hwnd.?, @ptrFromInt(@as(usize, @bitCast(@as(isize, afterHwnd)))), 0, 0, 0, 0, win.SWP_NOMOVE | win.SWP_NOSIZE | win.SWP_NOACTIVATE);
+}
+
 pub fn setAlphaValue(self: *Self, value: u8) void {
     self.blend_func.SourceConstantAlpha = value;
     self.invalidate();

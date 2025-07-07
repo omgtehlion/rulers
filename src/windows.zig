@@ -9,6 +9,7 @@ pub const HCURSOR = w.HCURSOR;
 pub const HBITMAP = *opaque {};
 pub const HBRUSH = w.HBRUSH;
 pub const HHOOK = *opaque {};
+pub const HANDLE = w.HANDLE;
 pub const UINT = w.UINT;
 pub const WPARAM = w.WPARAM;
 pub const LPARAM = w.LPARAM;
@@ -236,6 +237,8 @@ pub extern "gdi32" fn SelectObject(hdc: HDC, h: ?*anyopaque) callconv(.C) ?*anyo
 pub extern "gdi32" fn DeleteObject(ho: *anyopaque) callconv(.C) BOOL;
 pub const GetModuleHandleW = w.kernel32.GetModuleHandleW;
 pub extern "kernel32" fn LoadIconA(hInstance: ?w.HMODULE, lpIconName: [*:0]const u8) callconv(.C) ?HICON;
+pub extern "kernel32" fn CreateMutexA(lpMutexAttributes: ?*anyopaque, bInitialOwner: BOOL, lpName: ?[*:0]const u8) callconv(.C) ?HANDLE;
+pub extern "kernel32" fn FindWindowA(lpClassName: ?[*:0]const u8, lpWindowName: ?[*:0]const u8) callconv(.C) ?HWND;
 pub extern "shell32" fn Shell_NotifyIconA(dwMessage: DWORD, lpData: *NOTIFYICONDATAA) callconv(.C) BOOL;
 
 pub fn getCursorPos() !POINT {

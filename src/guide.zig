@@ -204,3 +204,7 @@ pub fn move(self: *Self, value: i32) void {
     self.base.move(if (self.vertical) value else null, if (self.vertical) null else value);
     _ = self.onMove();
 }
+
+pub fn bringToFront(self: *Self) void {
+    self.base.bringToFront(-1);
+}

@@ -5,6 +5,7 @@ const Ruler = @import("ruler.zig");
 const Guide = @import("guide.zig");
 
 const WM_TRAY = win.WM_USER + 0x01;
+pub const WM_BRING_TO_FRONT = win.WM_USER + 0x02;
 
 pub var control_pressed: bool = false;
 pub var running: bool = false;
@@ -178,6 +179,10 @@ fn mainWndProc(hwnd: win.HWND, msg: win.UINT, wparam: win.WPARAM, lparam: win.LP
             }
             return 0;
         },
+        WM_BRING_TO_FRONT => {
+            bringToFrontAll();
+            return 0;
+        },
         else => return win.DefWindowProcA(hwnd, msg, wparam, lparam),
     }
 }
@@ -270,11 +275,12 @@ pub fn removeAllGuides() void {
 
 pub fn bringToFrontAll() void {
     for (v_guides.items) |guide|
-        _ = win.SetForegroundWindow(guide.base.hwnd.?);
+        _ = guide.bringToFront();
     for (h_guides.items) |guide|
-        _ = win.SetForegroundWindow(guide.base.hwnd.?);
+        _ = guide.bringToFront();
     for (rulers.items) |ruler|
-        _ = win.SetForegroundWindow(ruler.base.hwnd.?);
+        _ = ruler.bringToFront();
+    std.debug.print("FRONT\n", .{});
 }
 
 pub fn notifyAll() void {

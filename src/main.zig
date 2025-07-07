@@ -9,6 +9,14 @@ const allocator = gpa.allocator();
 pub fn main() !void {
     defer _ = gpa.deinit();
 
+    const mutex = win.CreateMutexA(null, 1, "Global\\Rulers-ae565d49-98a8-4dee-975f-f79eaf8e0611") orelse return;
+    defer _ = std.os.windows.CloseHandle(mutex);
+    if (std.os.windows.GetLastError() == std.os.windows.Win32Error.ALREADY_EXISTS) {
+        if (win.FindWindowA("RulersWndCls", null)) |existing|
+            _ = win.PostMessageA(existing, globals.WM_BRING_TO_FRONT, 0, 0);
+        return;
+    }
+
     try globals.init(allocator);
     defer globals.deinit();
 
