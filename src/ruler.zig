@@ -113,7 +113,7 @@ fn createRuler(self: *Self) !void {
             if (y < RULER_WIDTH)
                 continue;
             const tick_index = @divTrunc(screen_y, MINOR_TICK);
-            const l: c_int = if (@mod(tick_index, 2) == 1) MINOR_TICK_LONG else MINOR_TICK_SHORT;
+            const l: c_int = if (@mod(tick_index, 2) == 0) MINOR_TICK_LONG else MINOR_TICK_SHORT;
             try gdip.drawLineI(graphics, black_pen, RULER_WIDTH - l, y, RULER_WIDTH - 1, y);
         }
     } else {
@@ -147,7 +147,7 @@ fn createRuler(self: *Self) !void {
             if (x < RULER_WIDTH)
                 continue;
             const tick_index = @divTrunc(screen_x, MINOR_TICK);
-            const l: c_int = if (@mod(tick_index, 2) == 1) MINOR_TICK_LONG else MINOR_TICK_SHORT;
+            const l: c_int = if (@mod(tick_index, 2) == 0) MINOR_TICK_LONG else MINOR_TICK_SHORT;
             try gdip.drawLineI(graphics, black_pen, x, RULER_WIDTH - l, x, RULER_WIDTH - 1);
         }
     }
