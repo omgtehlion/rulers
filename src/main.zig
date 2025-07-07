@@ -37,6 +37,8 @@ pub fn main() !void {
                 }
                 if (monitor) |m|
                     (try Guide.create(allocator, vertical, m.rect)).move(pos);
+            } else if (std.mem.eql(u8, name, "Mode")) {
+                globals.display_mode = std.fmt.parseInt(u32, value, 10) catch 0;
             }
         }
     } else |_| {
@@ -46,13 +48,14 @@ pub fn main() !void {
     globals.notifyAll();
     try globals.run();
 
-    // Save guides to INI file
-    var guides_content = std.ArrayList(u8).init(allocator);
-    defer guides_content.deinit();
-    try globals.dumpGuides(&guides_content);
     if (std.fs.cwd().createFile(ini_path, .{})) |file| {
         defer file.close();
-        _ = try file.writeAll(guides_content.items);
+        // Save guides to INI file
+        var content = std.ArrayList(u8).init(allocator);
+        defer content.deinit();
+        try globals.dumpGuides(&content);
+        try content.writer().print("Mode={}\n", .{globals.display_mode});
+        _ = try file.writeAll(content.items);
     } else |_| {
         // Could not save file
     }

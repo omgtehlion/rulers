@@ -7,8 +7,8 @@
             "label": "build",
             "type": "shell",
             //"command": "zig build",
-            //"command": "zig build -Doptimize=ReleaseSmall -Dcpu=skylake",
-            "command": "zig build -Doptimize=ReleaseSafe -Dcpu=skylake",
+            "command": "zig build -Doptimize=ReleaseSmall -Dcpu=skylake",
+            //"command": "zig build -Doptimize=ReleaseSafe -Dcpu=skylake",
         },
     ]
 }
