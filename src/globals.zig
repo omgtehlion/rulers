@@ -24,6 +24,7 @@ var main_window: ?win.HWND = null;
 var monitors: []win.MonitorInfo = undefined;
 var nid: win.NOTIFYICONDATAA = undefined;
 var tray_menu: ?win.HMENU = null;
+var current_ruler: ?*Ruler = null;
 
 // Menu item IDs
 pub const ID_MODE_NO = 1001;
@@ -160,7 +161,14 @@ fn mainWndProc(hwnd: win.HWND, msg: win.UINT, wparam: win.WPARAM, lparam: win.LP
                 ID_MODE_NO => display_mode = 0,
                 ID_MODE_ABS => display_mode = 1,
                 ID_MODE_REL => display_mode = 2,
-                ID_CLEAR_GUIDES => removeAllGuides(),
+                ID_CLEAR_GUIDES => {
+                    if (current_ruler) |ruler| {
+                        removeGuides(ruler.monitor.rect, !ruler.vertical);
+                        current_ruler = null;
+                    } else {
+                        removeAllGuides();
+                    }
+                },
                 ID_EXIT => running = false,
                 else => {},
             }
@@ -174,7 +182,7 @@ fn mainWndProc(hwnd: win.HWND, msg: win.UINT, wparam: win.WPARAM, lparam: win.LP
                     running = false;
                     _ = win.PostMessageA(hwnd, WM_TRAY, 0, 0);
                 },
-                win.WM_RBUTTONDOWN => showPopupMenu(),
+                win.WM_RBUTTONDOWN => showPopupMenu(null),
                 else => {},
             }
             return 0;
@@ -273,6 +281,20 @@ pub fn removeAllGuides() void {
     h_guides.clearRetainingCapacity();
 }
 
+pub fn removeGuides(monitor: win.RECT, vertical: bool) void {
+    const guides = if (vertical) &v_guides else &h_guides;
+    var i: usize = 0;
+    while (i < guides.items.len) {
+        const guide = guides.items[i];
+        if (std.meta.eql(guide.bounds, monitor)) {
+            _ = guides.swapRemove(i);
+            guide.deinit();
+        } else {
+            i += 1;
+        }
+    }
+}
+
 pub fn bringToFrontAll() void {
     for (v_guides.items) |guide|
         _ = guide.bringToFront();
@@ -280,7 +302,6 @@ pub fn bringToFrontAll() void {
         _ = guide.bringToFront();
     for (rulers.items) |ruler|
         _ = ruler.bringToFront();
-    std.debug.print("FRONT\n", .{});
 }
 
 pub fn notifyAll() void {
@@ -327,14 +348,19 @@ fn createTrayMenu() !win.HMENU {
     return menu;
 }
 
-pub fn showPopupMenu() void {
+pub fn showPopupMenu(ruler: ?*Ruler) void {
+    current_ruler = ruler;
     const cursor_pos = win.getCursorPos() catch return;
     if (tray_menu) |menu| {
+        const clear_text = if (ruler) |r| if (r.vertical) "Clear horizontal guides" else "Clear vertical guides" else "Clear all guides";
         var mii = std.mem.zeroInit(win.MENUITEMINFOA, .{
             .cbSize = @sizeOf(win.MENUITEMINFOA),
-            .fMask = win.MIIM_FTYPE | win.MIIM_STATE,
-            .fType = win.MFT_RADIOCHECK,
+            .fMask = win.MIIM_STRING,
+            .dwTypeData = @constCast(clear_text),
         });
+        _ = win.SetMenuItemInfoA(menu, ID_CLEAR_GUIDES, 0, &mii);
+        mii.fMask = win.MIIM_FTYPE | win.MIIM_STATE;
+        mii.fType = win.MFT_RADIOCHECK;
         mii.fState = if (display_mode == 0) win.MFS_CHECKED else win.MFS_UNCHECKED;
         _ = win.SetMenuItemInfoA(menu, ID_MODE_NO, 0, &mii);
         mii.fState = if (display_mode == 1) win.MFS_CHECKED else win.MFS_UNCHECKED;

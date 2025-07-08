@@ -202,7 +202,7 @@ fn processMsg(base: *AlphaWnd, msg: win.UINT, wparam: win.WPARAM, lparam: win.LP
             if (globals.control_pressed)
                 globals.removeAllGuides()
             else
-                globals.showPopupMenu();
+                globals.showPopupMenu(self);
             return 0;
         },
         win.WM_SETCURSOR => {
