@@ -108,6 +108,33 @@ pub const MENUITEMINFOA = extern struct {
     hbmpItem: ?HBITMAP,
 };
 
+pub const BITMAPV5HEADER = extern struct {
+    bV5Size: DWORD,
+    bV5Width: c_long,
+    bV5Height: c_long,
+    bV5Planes: WORD,
+    bV5BitCount: WORD,
+    bV5Compression: DWORD,
+    bV5SizeImage: DWORD,
+    bV5XPelsPerMeter: c_long,
+    bV5YPelsPerMeter: c_long,
+    bV5ClrUsed: DWORD,
+    bV5ClrImportant: DWORD,
+    bV5RedMask: DWORD,
+    bV5GreenMask: DWORD,
+    bV5BlueMask: DWORD,
+    bV5AlphaMask: DWORD,
+    bV5CSType: DWORD,
+    bV5Endpoints: [36]u8, // CIEXYZTRIPLE
+    bV5GammaRed: DWORD,
+    bV5GammaGreen: DWORD,
+    bV5GammaBlue: DWORD,
+    bV5Intent: DWORD,
+    bV5ProfileData: DWORD,
+    bV5ProfileSize: DWORD,
+    bV5Reserved: DWORD,
+};
+
 pub const WM_NULL = 0x0000;
 pub const WM_CREATE = 0x0001;
 pub const WM_DESTROY = 0x0002;
@@ -151,6 +178,7 @@ pub const SWP_NOZORDER = 0x0004;
 pub const SWP_NOACTIVATE = 0x0010;
 
 pub const HWND_TOPMOST = @as(HWND, @ptrFromInt(@as(usize, @bitCast(@as(isize, -1)))));
+pub const HWND_NOTOPMOST = @as(HWND, @ptrFromInt(@as(usize, @bitCast(@as(isize, -2)))));
 
 pub const ULW_ALPHA = 0x00000002;
 
@@ -194,6 +222,10 @@ pub const MIIM_FTYPE = 0x00000100;
 pub const TPM_RIGHTBUTTON = 0x0002;
 pub const TPM_RETURNCMD = 0x0100;
 
+pub const BI_RGB = 0;
+pub const DIB_RGB_COLORS = 0;
+pub const LCS_WINDOWS_COLOR_SPACE = 0x57696E20; // 'Win '
+
 pub extern "user32" fn RegisterClassA(lpWndClass: *const WNDCLASSA) callconv(.C) c_ushort;
 pub extern "user32" fn CreateWindowExA(dwExStyle: DWORD, lpClassName: [*:0]const u8, lpWindowName: [*:0]const u8, dwStyle: DWORD, X: c_int, Y: c_int, nWidth: c_int, nHeight: c_int, hWndParent: ?HWND, hMenu: ?HMENU, hInstance: w.HMODULE, lpParam: ?*anyopaque) callconv(.C) ?HWND;
 pub extern "user32" fn DestroyWindow(hWnd: HWND) BOOL;
@@ -235,6 +267,7 @@ pub extern "gdi32" fn CreateCompatibleDC(hdc: ?HDC) callconv(.C) ?HDC;
 pub extern "gdi32" fn DeleteDC(hdc: HDC) callconv(.C) BOOL;
 pub extern "gdi32" fn SelectObject(hdc: HDC, h: ?*anyopaque) callconv(.C) ?*anyopaque;
 pub extern "gdi32" fn DeleteObject(ho: *anyopaque) callconv(.C) BOOL;
+pub extern "gdi32" fn CreateDIBSection(hdc: ?HDC, lpbmi: *const anyopaque, usage: UINT, ppvBits: *?*anyopaque, hSection: ?HANDLE, offset: DWORD) callconv(.C) ?HBITMAP;
 pub const GetModuleHandleW = w.kernel32.GetModuleHandleW;
 pub extern "kernel32" fn LoadIconA(hInstance: ?w.HMODULE, lpIconName: [*:0]const u8) callconv(.C) ?HICON;
 pub extern "kernel32" fn CreateMutexA(lpMutexAttributes: ?*anyopaque, bInitialOwner: BOOL, lpName: ?[*:0]const u8) callconv(.C) ?HANDLE;

@@ -35,7 +35,7 @@ pub const Status = enum(c_int) {
     ProfileNotFound = 21,
 };
 
-pub const PixelFormat32bppARGB: c_int = 0x26200A;
+pub const PixelFormat32bppPARGB: c_int = 0xE200B;
 
 const GdiplusStartupInput = extern struct {
     GdiplusVersion: win.DWORD,

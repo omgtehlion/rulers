@@ -52,11 +52,9 @@ pub fn deinit(self: *Self) void {
 }
 
 fn createRuler(self: *Self) !void {
-    self.base.bitmap = try gdip.createBitmapFromScan0(self.base.width, self.base.height, 0, gdip.PixelFormat32bppARGB, null);
-    defer gdip.disposeImage(@ptrCast(self.base.bitmap.?)) catch {};
-    const graphics = try gdip.createGraphicsFromImage(@ptrCast(self.base.bitmap.?));
-    defer gdip.deleteGraphics(graphics) catch {};
-    try gdip.setTextRenderingHint(graphics, .TextRenderingHintSystemDefault);
+    var bitmap = @import("cached_bitmap.zig").init(self.base.width, self.base.height);
+    defer bitmap.deinit();
+    const graphics = try bitmap.beginDraw();
 
     // Create brushes and pens
     const white_brush = try gdip.createSolidFill(gdip.makeColor(255, 255, 255, 255));
@@ -151,7 +149,7 @@ fn createRuler(self: *Self) !void {
             try gdip.drawLineI(graphics, black_pen, x, RULER_WIDTH - l, x, RULER_WIDTH - 1);
         }
     }
-    self.base.redraw();
+    self.base.update(try bitmap.endDraw());
 }
 
 fn createNew(self: *Self) void {
@@ -214,6 +212,6 @@ fn processMsg(base: *AlphaWnd, msg: win.UINT, wparam: win.WPARAM, lparam: win.LP
 }
 
 pub fn bringToFront(self: *Self) void {
-    self.base.bringToFront(-1);
-    self.base.bringToFront(-2);
+    self.base.bringToFront(win.HWND_TOPMOST);
+    self.base.bringToFront(win.HWND_NOTOPMOST);
 }
