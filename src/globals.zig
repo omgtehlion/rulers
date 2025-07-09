@@ -3,6 +3,7 @@ const win = @import("windows.zig");
 const gdip = @import("gdiplus.zig");
 const Ruler = @import("ruler.zig");
 const Guide = @import("guide.zig");
+const CachedBitmap = @import("cached_bitmap.zig");
 
 const WM_TRAY = win.WM_USER + 0x01;
 pub const WM_BRING_TO_FRONT = win.WM_USER + 0x02;
@@ -26,6 +27,8 @@ var nid: win.NOTIFYICONDATAA = undefined;
 var tray_menu: ?win.HMENU = null;
 var current_ruler: ?*Ruler = null;
 
+var bitmap_cache: std.ArrayList(*CachedBitmap) = undefined;
+
 // Menu item IDs
 pub const ID_MODE_NO = 1001;
 pub const ID_MODE_ABS = 1002;
@@ -35,9 +38,10 @@ pub const ID_EXIT = 1005;
 
 pub fn init(alloc: std.mem.Allocator) !void {
     allocator = alloc;
-    v_guides = std.ArrayList(*Guide).init(allocator);
-    h_guides = std.ArrayList(*Guide).init(allocator);
-    rulers = std.ArrayList(*Ruler).init(allocator);
+    v_guides = .init(allocator);
+    h_guides = .init(allocator);
+    rulers = .init(allocator);
+    bitmap_cache = .init(allocator);
 
     try gdip.startup();
 
@@ -109,6 +113,11 @@ pub fn deinit() void {
     allocator.free(monitors);
     v_guides.deinit();
     h_guides.deinit();
+    for (bitmap_cache.items) |b| {
+        b.deinit();
+        allocator.destroy(b);
+    }
+    bitmap_cache.deinit();
     gdip.shutdown();
 }
 
@@ -196,6 +205,9 @@ fn mainWndProc(hwnd: win.HWND, msg: win.UINT, wparam: win.WPARAM, lparam: win.LP
 }
 
 fn handleMonitorChange() !void {
+    for (bitmap_cache.items) |b|
+        b.deinit();
+    bitmap_cache.clearRetainingCapacity();
     const new_monitors = try win.enumMonitors(allocator);
     defer allocator.free(new_monitors);
     if (monitorsEqual(monitors, new_monitors))
@@ -373,4 +385,14 @@ pub fn showPopupMenu(ruler: ?*Ruler) void {
         _ = win.TrackPopupMenu(menu, 0, cursor_pos.x, cursor_pos.y, 0, hwnd, null);
         _ = win.PostMessageA(hwnd, win.WM_NULL, 0, 0); // Post a message to ensure the menu closes properly
     }
+}
+
+pub fn getBuffer(width: i32, height: i32) !*CachedBitmap {
+    for (bitmap_cache.items) |b|
+        if (b.width == width and b.height == height)
+            return b;
+    const bitmap = try allocator.create(CachedBitmap);
+    bitmap.* = .init(width, height);
+    try bitmap_cache.append(bitmap);
+    return bitmap;
 }

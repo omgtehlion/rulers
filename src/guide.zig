@@ -7,7 +7,7 @@ const globals = @import("globals.zig");
 const Self = @This();
 
 base: AlphaWnd,
-buffer: @import("cached_bitmap.zig"),
+shared_bimap: ?*@import("cached_bitmap.zig") = null,
 vertical: bool,
 distance: i32 = 0,
 bounds: win.RECT,
@@ -32,7 +32,6 @@ pub fn create(allocator: std.mem.Allocator, vertical: bool, bounds: win.RECT) !*
     const self = try allocator.create(Self);
     self.* = Self{
         .base = undefined,
-        .buffer = .init(if (vertical) 50 else bounds.right - bounds.left, if (vertical) bounds.bottom - bounds.top else 50),
         .vertical = vertical,
         .allocator = allocator,
         .bounds = bounds,
@@ -58,11 +57,9 @@ pub fn create(allocator: std.mem.Allocator, vertical: bool, bounds: win.RECT) !*
 
 pub fn setBounds(self: *Self, bounds: win.RECT) !void {
     self.bounds = bounds;
-    const width = if (self.vertical) 50 else bounds.right - bounds.left;
-    const height = if (self.vertical) bounds.bottom - bounds.top else 50;
-    try self.buffer.resize(width, height);
-    self.base.width = width;
-    self.base.height = height;
+    self.shared_bimap = null;
+    self.base.width = if (self.vertical) 50 else bounds.right - bounds.left;
+    self.base.height = if (self.vertical) bounds.bottom - bounds.top else 50;
     if (self.vertical)
         self.base.top = bounds.top
     else
@@ -81,7 +78,6 @@ fn initializeStatics() !void {
 }
 
 pub fn deinit(self: *Self) void {
-    self.buffer.deinit();
     self.base.deinit();
     self.allocator.destroy(self);
 }
@@ -95,7 +91,10 @@ fn needsRepaint(self: *Self) bool {
 
 fn repaint(self: *Self) !void {
     if (!self.needsRepaint()) return;
-    const graphics = try self.buffer.beginDraw();
+    if (self.shared_bimap == null)
+        self.shared_bimap = try globals.getBuffer(self.base.width, self.base.height);
+    const buffer = if (self.shared_bimap) |b| b else return;
+    const graphics = try buffer.beginDraw();
     try gdip.graphicsClear(graphics, gdip.makeColor(0, 0, 0, 0));
     const width = self.bounds.right - self.bounds.left;
     const height = self.bounds.bottom - self.bounds.top;
@@ -110,7 +109,7 @@ fn repaint(self: *Self) !void {
     self.last_control_state = globals.control_pressed;
     self.last_position = if (self.vertical) self.base.left else self.base.top;
     _ = try self.drawCoordinates(graphics);
-    self.base.update(try self.buffer.endDraw());
+    self.base.update(try buffer.endDraw());
 }
 
 fn drawCoordinates(self: *Self, graphics: *gdip.Graphics) !bool {
