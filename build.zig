@@ -39,6 +39,7 @@ pub fn build(b: *std.Build) void {
     exe.linkSystemLibrary("shell32");
     exe.linkSystemLibrary("gdiplus");
     exe.addObjectFile(.{ .cwd_relative = "rulers.res.obj" });
+    //exe.addWin32ResourceFile(.{ .file = .{ .cwd_relative = "MAINICON.rc" } });
 
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default
