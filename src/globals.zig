@@ -13,9 +13,6 @@ pub var running: bool = false;
 pub var rulers: std.ArrayList(*Ruler) = undefined;
 pub var display_mode: u32 = 0;
 
-pub var size_h_cursor: ?win.HCURSOR = null;
-pub var size_v_cursor: ?win.HCURSOR = null;
-
 var allocator: std.mem.Allocator = undefined;
 var hook: ?win.HHOOK = null;
 var v_guides: std.ArrayList(*Guide) = undefined;
@@ -46,9 +43,6 @@ pub fn init(alloc: std.mem.Allocator) !void {
     try gdip.startup();
 
     const hinstance = win.GetModuleHandleW(null) orelse return error.GetModuleHandleFailed;
-
-    size_h_cursor = win.LoadCursorA(null, win.IDC_SIZEWE);
-    size_v_cursor = win.LoadCursorA(null, win.IDC_SIZENS);
 
     hook = win.SetWindowsHookExA(win.WH_KEYBOARD_LL, lowLevelKeyboardProc, hinstance, 0);
     running = true;

@@ -155,12 +155,12 @@ fn createNew(self: *Self) void {
     const p = win.getCursorPos() catch return;
     if (self.vertical) {
         if (p.y > self.base.top + RULER_WIDTH) {
-            _ = win.SetCursor(globals.size_h_cursor);
+            _ = win.SetCursor(Guide.size_h_cursor);
             self.current_guide = Guide.create(self.allocator, true, self.monitor.rect) catch return; // true = vertical guide
         }
     } else {
         if (p.x > self.base.left + RULER_WIDTH) {
-            _ = win.SetCursor(globals.size_v_cursor);
+            _ = win.SetCursor(Guide.size_v_cursor);
             self.current_guide = Guide.create(self.allocator, false, self.monitor.rect) catch return; // false = horizontal guide
         }
     }

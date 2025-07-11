@@ -5,7 +5,6 @@ pub const HWND = w.HWND;
 pub const HDC = w.HDC;
 pub const HMENU = w.HMENU;
 pub const HICON = w.HICON;
-pub const HCURSOR = w.HCURSOR;
 pub const HBITMAP = *opaque {};
 pub const HBRUSH = w.HBRUSH;
 pub const HHOOK = *opaque {};
@@ -38,7 +37,7 @@ pub const WNDCLASSA = extern struct {
     cbWndExtra: c_int,
     hInstance: w.HMODULE,
     hIcon: ?HICON,
-    hCursor: ?HCURSOR,
+    hCursor: ?HANDLE,
     hbrBackground: ?HBRUSH,
     lpszMenuName: ?[*:0]const u8,
     lpszClassName: [*:0]const u8,
@@ -226,6 +225,11 @@ pub const BI_RGB = 0;
 pub const DIB_RGB_COLORS = 0;
 pub const LCS_WINDOWS_COLOR_SPACE = 0x57696E20; // 'Win '
 
+pub const IMAGE_CURSOR = 2;
+pub const LR_DEFAULTSIZE = 0x00000040;
+pub const LR_LOADFROMFILE = 0x00000010;
+pub const LR_SHARED = 0x00008000;
+
 pub extern "user32" fn RegisterClassA(lpWndClass: *const WNDCLASSA) callconv(.C) c_ushort;
 pub extern "user32" fn CreateWindowExA(dwExStyle: DWORD, lpClassName: [*:0]const u8, lpWindowName: [*:0]const u8, dwStyle: DWORD, X: c_int, Y: c_int, nWidth: c_int, nHeight: c_int, hWndParent: ?HWND, hMenu: ?HMENU, hInstance: w.HMODULE, lpParam: ?*anyopaque) callconv(.C) ?HWND;
 pub extern "user32" fn DestroyWindow(hWnd: HWND) BOOL;
@@ -246,8 +250,9 @@ pub extern "user32" fn SetWindowLongPtrA(hWnd: HWND, nIndex: c_int, dwNewLong: L
 pub extern "user32" fn GetWindowLongPtrA(hWnd: HWND, nIndex: c_int) callconv(.C) LONG_PTR;
 pub extern "user32" fn SetWindowLongA(hWnd: HWND, nIndex: c_int, dwNewLong: c_long) callconv(.C) c_long;
 pub extern "user32" fn GetWindowLongA(hWnd: HWND, nIndex: c_int) callconv(.C) c_long;
-pub extern "user32" fn LoadCursorA(hInstance: ?w.HMODULE, lpCursorName: [*:0]const u8) callconv(.C) ?HCURSOR;
-pub extern "user32" fn SetCursor(hCursor: ?HCURSOR) callconv(.C) ?HCURSOR;
+pub extern "user32" fn LoadCursorA(hInstance: ?w.HMODULE, lpCursorName: [*:0]const u8) callconv(.C) ?HANDLE;
+pub extern "user32" fn LoadImageA(hInst: ?w.HMODULE, name: [*:0]const u8, type: UINT, cx: c_int, cy: c_int, fuLoad: UINT) callconv(.C) ?HANDLE;
+pub extern "user32" fn SetCursor(hCursor: ?HANDLE) callconv(.C) ?HANDLE;
 pub extern "user32" fn GetCursorPos(lpPoint: *POINT) callconv(.C) BOOL;
 pub extern "user32" fn SetForegroundWindow(hWnd: HWND) callconv(.C) BOOL;
 pub extern "user32" fn PostMessageA(hWnd: ?HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) callconv(.C) BOOL;

@@ -22,13 +22,10 @@ var coord_font: ?*gdip.Font = null;
 var coord_brush: ?*gdip.Brush = null;
 var coord_under_color = gdip.makeColor(190, 255, 255, 255);
 var line_pen: ?*gdip.Pen = null;
-var initialized: bool = false;
+pub var size_h_cursor: ?win.HANDLE = null;
+pub var size_v_cursor: ?win.HANDLE = null;
 
 pub fn create(allocator: std.mem.Allocator, vertical: bool, bounds: win.RECT) !*Self {
-    if (!initialized) {
-        try initializeStatics();
-        initialized = true;
-    }
     const self = try allocator.create(Self);
     self.* = Self{
         .base = undefined,
@@ -67,13 +64,17 @@ pub fn setBounds(self: *Self, bounds: win.RECT) !void {
     try self.repaint();
 }
 
-fn initializeStatics() !void {
+pub fn initializeStatics() !void {
     transp_brush = try gdip.createSolidFill(gdip.makeColor(1, 130, 130, 130));
     const font_family = try gdip.createFontFamilyFromName(std.unicode.utf8ToUtf16LeStringLiteral("Calibri"), null);
     defer gdip.deleteFontFamily(font_family) catch {};
     coord_font = try gdip.createFont(font_family, 11, .FontStyleRegular, .UnitPixel);
     coord_brush = try gdip.createSolidFill(gdip.makeColor(255, 0, 0, 0));
     line_pen = try gdip.createPen1(gdip.makeColor(255, 74, 255, 255), 1.0, .UnitPixel);
+    const hinstance = win.GetModuleHandleW(null) orelse return error.GetModuleHandleFailed;
+    size_v_cursor = win.LoadCursorA(hinstance, @as([*:0]const u8, @ptrFromInt(201))) orelse win.LoadCursorA(null, win.IDC_SIZENS);
+    size_h_cursor = win.LoadCursorA(hinstance, @as([*:0]const u8, @ptrFromInt(202))) orelse win.LoadCursorA(null, win.IDC_SIZEWE);
+    //size_v_cursor = win.LoadImageA(null, "SIZEV.cur", win.IMAGE_CURSOR, 0, 0, win.LR_LOADFROMFILE);
 }
 
 pub fn deinit(self: *Self) void {
@@ -185,7 +186,7 @@ fn processMsg(xbase: *anyopaque, msg: win.UINT, wparam: win.WPARAM, lparam: win.
             return 0;
         },
         win.WM_SETCURSOR => {
-            _ = win.SetCursor(if (self.vertical) globals.size_h_cursor else globals.size_v_cursor);
+            _ = win.SetCursor(if (self.vertical) size_h_cursor else size_v_cursor);
             return 0;
         },
         else => return null,

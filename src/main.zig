@@ -19,6 +19,7 @@ pub fn main() !void {
 
     try globals.init(allocator);
     defer globals.deinit();
+    try Guide.initializeStatics();
 
     // Load guides from INI file
     const ini_path = "rulers.ini";
