@@ -1,12 +1,12 @@
 const std = @import("std");
 const win = @import("windows.zig");
 const gdip = @import("gdiplus.zig");
-const AlphaWnd = @import("alpha_wnd.zig");
 const globals = @import("globals.zig");
 
+const Base = @import("alpha_wnd.zig").AlphaWnd(processMsg);
 const Self = @This();
 
-base: AlphaWnd,
+base: Base,
 shared_bimap: ?*@import("cached_bitmap.zig") = null,
 vertical: bool,
 distance: i32 = 0,
@@ -37,7 +37,7 @@ pub fn create(allocator: std.mem.Allocator, vertical: bool, bounds: win.RECT) !*
         .bounds = bounds,
     };
 
-    try AlphaWnd.createAt(
+    try Base.createAt(
         &self.base,
         win.CS_DBLCLKS,
         win.WS_POPUP,
@@ -48,7 +48,6 @@ pub fn create(allocator: std.mem.Allocator, vertical: bool, bounds: win.RECT) !*
         null,
         null,
     );
-    self.base.processMsg = processMsg;
     try self.setBounds(bounds);
     try globals.addGuide(self);
     self.notify();
@@ -148,8 +147,9 @@ fn drawText(self: *Self, graphics: *gdip.Graphics, rect: gdip.Rect, val: i32) !v
     ) catch {};
 }
 
-fn processMsg(base: *AlphaWnd, msg: win.UINT, wparam: win.WPARAM, lparam: win.LPARAM) ?win.LRESULT {
-    const self: *Self = @fieldParentPtr("base", base);
+fn processMsg(xbase: *anyopaque, msg: win.UINT, wparam: win.WPARAM, lparam: win.LPARAM) ?win.LRESULT {
+    const base: *Base = @alignCast(@ptrCast(xbase));
+    const self: *Self = @fieldParentPtr("base", @as(*Base, @alignCast(@ptrCast(base))));
     _ = wparam;
     switch (msg) {
         win.WM_NCHITTEST => return win.HTCAPTION,
@@ -161,20 +161,20 @@ fn processMsg(base: *AlphaWnd, msg: win.UINT, wparam: win.WPARAM, lparam: win.LP
         win.WM_MOVING => {
             const rect: *win.RECT = @ptrFromInt(@as(usize, @bitCast(lparam)));
             if (self.vertical) {
-                rect.top = self.base.top;
-                rect.bottom = self.base.top + self.base.height;
+                rect.top = base.top;
+                rect.bottom = base.top + base.height;
             } else {
-                rect.left = self.base.left;
-                rect.right = self.base.left + self.base.width;
+                rect.left = base.left;
+                rect.right = base.left + base.width;
             }
             self.repaint() catch {};
             return 0;
         },
         win.WM_EXITSIZEMOVE => {
             const should_remove = if (self.vertical)
-                self.base.left < self.bounds.left + 5
+                base.left < self.bounds.left + 5
             else
-                self.base.top < self.bounds.top + 5;
+                base.top < self.bounds.top + 5;
             if (should_remove) {
                 globals.removeGuide(self);
                 return 0;

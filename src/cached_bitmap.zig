@@ -52,7 +52,7 @@ pub fn beginDraw(self: *Self) !*gdip.Graphics {
     self.cleanup();
     const hdc = win.GetDC(null) orelse return error.GetDCFailed;
     defer _ = win.ReleaseDC(null, hdc);
-    self.hbitmap = win.CreateDIBSection(hdc, @ptrCast(&std.mem.zeroInit(win.BITMAPV5HEADER, .{
+    self.hbitmap = win.CreateDIBSection(hdc, &std.mem.zeroInit(win.BITMAPV5HEADER, .{
         .bV5Size = @sizeOf(win.BITMAPV5HEADER),
         .bV5Width = self.width,
         .bV5Height = -self.height, // Negative for top-down DIB
@@ -64,7 +64,7 @@ pub fn beginDraw(self: *Self) !*gdip.Graphics {
         .bV5BlueMask = 0x000000FF,
         .bV5AlphaMask = 0xFF000000,
         .bV5CSType = win.LCS_WINDOWS_COLOR_SPACE,
-    })), win.DIB_RGB_COLORS, &self.bits, null, 0) orelse return error.CreateDIBSectionFailed;
+    }), win.DIB_RGB_COLORS, &self.bits, null, 0) orelse return error.CreateDIBSectionFailed;
     self.bmp_dc = win.CreateCompatibleDC(hdc) orelse return error.CreateCompatibleDCFailed;
     _ = win.SelectObject(self.bmp_dc.?, self.hbitmap.?);
     self.gd_bitmap = try gdip.createBitmapFromScan0(self.width, self.height, self.width * 4, gdip.PixelFormat32bppPARGB, self.bits);

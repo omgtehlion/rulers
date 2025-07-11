@@ -267,7 +267,7 @@ pub extern "gdi32" fn CreateCompatibleDC(hdc: ?HDC) callconv(.C) ?HDC;
 pub extern "gdi32" fn DeleteDC(hdc: HDC) callconv(.C) BOOL;
 pub extern "gdi32" fn SelectObject(hdc: HDC, h: ?*anyopaque) callconv(.C) ?*anyopaque;
 pub extern "gdi32" fn DeleteObject(ho: *anyopaque) callconv(.C) BOOL;
-pub extern "gdi32" fn CreateDIBSection(hdc: ?HDC, lpbmi: *const anyopaque, usage: UINT, ppvBits: *?*anyopaque, hSection: ?HANDLE, offset: DWORD) callconv(.C) ?HBITMAP;
+pub extern "gdi32" fn CreateDIBSection(hdc: ?HDC, lpbmi: *const BITMAPV5HEADER, usage: UINT, ppvBits: *?*anyopaque, hSection: ?HANDLE, offset: DWORD) callconv(.C) ?HBITMAP;
 pub const GetModuleHandleW = w.kernel32.GetModuleHandleW;
 pub extern "kernel32" fn LoadIconA(hInstance: ?w.HMODULE, lpIconName: [*:0]const u8) callconv(.C) ?HICON;
 pub extern "kernel32" fn CreateMutexA(lpMutexAttributes: ?*anyopaque, bInitialOwner: BOOL, lpName: ?[*:0]const u8) callconv(.C) ?HANDLE;

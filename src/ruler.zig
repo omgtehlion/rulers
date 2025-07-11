@@ -1,7 +1,6 @@
 const std = @import("std");
 const win = @import("windows.zig");
 const gdip = @import("gdiplus.zig");
-const AlphaWnd = @import("alpha_wnd.zig");
 const Guide = @import("guide.zig");
 const globals = @import("globals.zig");
 
@@ -13,9 +12,10 @@ const MINOR_TICK_LONG = 6;
 const FONT_SIZE = 11;
 const LABEL_Y_OFFSET = -2;
 
+const Base = @import("alpha_wnd.zig").AlphaWnd(processMsg);
 const Self = @This();
 
-base: AlphaWnd,
+base: Base,
 current_guide: ?*Guide = null,
 allocator: std.mem.Allocator,
 vertical: bool,
@@ -26,7 +26,7 @@ pub fn create(allocator: std.mem.Allocator, vertical: bool, monitor: win.Monitor
     self.allocator = allocator;
     self.vertical = vertical;
     self.monitor = monitor;
-    try AlphaWnd.createAt(
+    try Base.createAt(
         &self.base,
         win.CS_DBLCLKS,
         win.WS_POPUP,
@@ -37,7 +37,6 @@ pub fn create(allocator: std.mem.Allocator, vertical: bool, monitor: win.Monitor
         null,
         null,
     );
-    self.base.processMsg = processMsg;
     self.base.width = if (vertical) RULER_WIDTH else monitor.rect.right - monitor.rect.left;
     self.base.height = if (!vertical) RULER_WIDTH else monitor.rect.bottom - monitor.rect.top;
     self.base.left = monitor.rect.left;
@@ -167,8 +166,9 @@ fn createNew(self: *Self) void {
     }
 }
 
-fn processMsg(base: *AlphaWnd, msg: win.UINT, wparam: win.WPARAM, lparam: win.LPARAM) ?win.LRESULT {
+fn processMsg(xbase: *anyopaque, msg: win.UINT, wparam: win.WPARAM, lparam: win.LPARAM) ?win.LRESULT {
     _ = wparam;
+    const base: *Base = @alignCast(@ptrCast(xbase));
     const self: *Self = @fieldParentPtr("base", base);
     switch (msg) {
         win.WM_NCHITTEST => return win.HTCAPTION,
