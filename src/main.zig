@@ -47,7 +47,7 @@ pub fn main() !void {
                 if (monitor) |m|
                     (try Guide.create(allocator, vertical, m.rect)).move(pos);
             } else if (std.mem.eql(u8, name, "Mode")) {
-                globals.display_mode = std.fmt.parseInt(u32, value, 10) catch 0;
+                globals.display_mode = @enumFromInt(std.fmt.parseInt(u32, value, 10) catch 0);
             }
         }
     } else |_| {
@@ -63,7 +63,7 @@ pub fn main() !void {
         var content = std.ArrayList(u8).init(allocator);
         defer content.deinit();
         try globals.dumpGuides(&content);
-        try content.writer().print("Mode={}\n", .{globals.display_mode});
+        try content.writer().print("Mode={}\n", .{@intFromEnum(globals.display_mode)});
         _ = try file.writeAll(content.items);
     } else |_| {
         // Could not save file

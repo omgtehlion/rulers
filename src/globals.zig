@@ -11,7 +11,7 @@ pub const WM_BRING_TO_FRONT = win.WM_USER + 0x02;
 pub var control_pressed: bool = false;
 pub var running: bool = false;
 pub var rulers: std.ArrayList(*Ruler) = undefined;
-pub var display_mode: u32 = 0;
+pub var display_mode: enum { none, absolute, relative, invalid } = .none;
 
 var allocator: std.mem.Allocator = undefined;
 var hook: ?win.HHOOK = null;
@@ -27,11 +27,11 @@ var current_ruler: ?*Ruler = null;
 var bitmap_cache: std.ArrayList(*CachedBitmap) = undefined;
 
 // Menu item IDs
-pub const ID_MODE_NO = 1001;
-pub const ID_MODE_ABS = 1002;
-pub const ID_MODE_REL = 1003;
-pub const ID_CLEAR_GUIDES = 1004;
-pub const ID_EXIT = 1005;
+const ID_MODE_NO = 1001;
+const ID_MODE_ABS = 1002;
+const ID_MODE_REL = 1003;
+const ID_CLEAR_GUIDES = 1004;
+const ID_EXIT = 1005;
 
 pub fn init(alloc: std.mem.Allocator) !void {
     allocator = alloc;
@@ -161,9 +161,9 @@ fn mainWndProc(hwnd: win.HWND, msg: win.UINT, wparam: win.WPARAM, lparam: win.LP
         win.WM_COMMAND => {
             const cmd_id = @as(u16, @truncate(wparam & 0xFFFF));
             switch (cmd_id) {
-                ID_MODE_NO => display_mode = 0,
-                ID_MODE_ABS => display_mode = 1,
-                ID_MODE_REL => display_mode = 2,
+                ID_MODE_NO => display_mode = .none,
+                ID_MODE_ABS => display_mode = .absolute,
+                ID_MODE_REL => display_mode = .relative,
                 ID_CLEAR_GUIDES => {
                     if (current_ruler) |ruler| {
                         removeGuides(ruler.monitor.rect, !ruler.vertical);
@@ -367,11 +367,11 @@ pub fn showPopupMenu(ruler: ?*Ruler) void {
         _ = win.SetMenuItemInfoA(menu, ID_CLEAR_GUIDES, 0, &mii);
         mii.fMask = win.MIIM_FTYPE | win.MIIM_STATE;
         mii.fType = win.MFT_RADIOCHECK;
-        mii.fState = if (display_mode == 0) win.MFS_CHECKED else win.MFS_UNCHECKED;
+        mii.fState = if (display_mode == .none) win.MFS_CHECKED else win.MFS_UNCHECKED;
         _ = win.SetMenuItemInfoA(menu, ID_MODE_NO, 0, &mii);
-        mii.fState = if (display_mode == 1) win.MFS_CHECKED else win.MFS_UNCHECKED;
+        mii.fState = if (display_mode == .absolute) win.MFS_CHECKED else win.MFS_UNCHECKED;
         _ = win.SetMenuItemInfoA(menu, ID_MODE_ABS, 0, &mii);
-        mii.fState = if (display_mode == 2) win.MFS_CHECKED else win.MFS_UNCHECKED;
+        mii.fState = if (display_mode == .relative) win.MFS_CHECKED else win.MFS_UNCHECKED;
         _ = win.SetMenuItemInfoA(menu, ID_MODE_REL, 0, &mii);
 
         const hwnd = main_window.?;

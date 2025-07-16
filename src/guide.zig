@@ -12,7 +12,7 @@ vertical: bool,
 distance: i32 = 0,
 bounds: win.RECT,
 allocator: std.mem.Allocator,
-last_display_mode: u32 = 0,
+last_display_mode: @TypeOf(globals.display_mode) = .invalid,
 last_control_state: bool = false,
 last_position: i32 = 0,
 
@@ -20,7 +20,7 @@ last_position: i32 = 0,
 var transp_brush: ?*gdip.Brush = null;
 var coord_font: ?*gdip.Font = null;
 var coord_brush: ?*gdip.Brush = null;
-var coord_under_color = gdip.makeColor(190, 255, 255, 255);
+const coord_under_color = gdip.makeColor(190, 255, 255, 255);
 var line_pen: ?*gdip.Pen = null;
 pub var size_h_cursor: ?win.HANDLE = null;
 pub var size_v_cursor: ?win.HANDLE = null;
@@ -60,7 +60,7 @@ pub fn setBounds(self: *Self, bounds: win.RECT) !void {
         self.base.top = bounds.top
     else
         self.base.left = bounds.left;
-    self.last_display_mode = 100;
+    self.last_display_mode = .invalid;
     try self.repaint();
 }
 
@@ -113,9 +113,9 @@ fn repaint(self: *Self) !void {
 }
 
 fn drawCoordinates(self: *Self, graphics: *gdip.Graphics) !bool {
-    if (globals.display_mode == 0)
+    if (globals.display_mode == .none)
         return false;
-    if (globals.display_mode == 2)
+    if (globals.display_mode == .relative)
         self.distance = globals.getDistance(self);
     const rect = if (self.vertical)
         gdip.Rect{ .X = 3, .Y = 16, .Width = 35, .Height = 12 }
@@ -133,8 +133,8 @@ fn drawText(self: *Self, graphics: *gdip.Graphics, rect: gdip.Rect, val: i32) !v
     var fba = std.heap.FixedBufferAllocator.init(&buffer);
     const local_allocator = fba.allocator();
     const text_str = switch (globals.display_mode) {
-        1 => try std.fmt.allocPrint(local_allocator, "{}", .{val + 2}),
-        2 => try std.fmt.allocPrint(local_allocator, "+{}", .{val - self.distance}),
+        .absolute => try std.fmt.allocPrint(local_allocator, "{}", .{val + 2}),
+        .relative => try std.fmt.allocPrint(local_allocator, "+{}", .{val - self.distance}),
         else => return,
     };
     gdip.drawString(
@@ -181,7 +181,7 @@ fn processMsg(xbase: *anyopaque, msg: win.UINT, wparam: win.WPARAM, lparam: win.
                 return 0;
             }
             self.repaint() catch {};
-            if (globals.display_mode == 2)
+            if (globals.display_mode == .relative)
                 globals.notifyAll();
             return 0;
         },
@@ -200,7 +200,7 @@ pub fn notify(self: *Self) void {
     else
         current_ex_style | win.WS_EX_TRANSPARENT;
     _ = win.SetWindowLongPtrA(self.base.hwnd.?, win.GWLP_EXSTYLE, new_style);
-    self.last_display_mode = 100;
+    self.last_display_mode = .invalid;
     self.repaint() catch {};
     self.bringToFront();
 }
