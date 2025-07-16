@@ -3,7 +3,6 @@ const win = @import("windows.zig");
 const gdip = @import("gdiplus.zig");
 const Ruler = @import("ruler.zig");
 const Guide = @import("guide.zig");
-const CachedBitmap = @import("cached_bitmap.zig");
 
 const WM_TRAY = win.WM_USER + 0x01;
 pub const WM_BRING_TO_FRONT = win.WM_USER + 0x02;
@@ -24,7 +23,7 @@ var nid: win.NOTIFYICONDATAA = undefined;
 var tray_menu: ?win.HMENU = null;
 var current_ruler: ?*Ruler = null;
 
-var bitmap_cache: std.ArrayList(*CachedBitmap) = undefined;
+var bitmap_cache: std.ArrayList(*gdip.CachedBitmap) = undefined;
 
 // Menu item IDs
 const ID_MODE_NO = 1001;
@@ -381,12 +380,12 @@ pub fn showPopupMenu(ruler: ?*Ruler) void {
     }
 }
 
-pub fn getBuffer(width: i32, height: i32) !*CachedBitmap {
+pub fn getBuffer(width: i32, height: i32) !*gdip.CachedBitmap {
     for (bitmap_cache.items) |b|
         if (b.width == width and b.height == height)
             return b;
-    const bitmap = try allocator.create(CachedBitmap);
-    bitmap.* = .init(width, height);
+    const bitmap = try allocator.create(gdip.CachedBitmap);
+    bitmap.* = try .init(width, height);
     try bitmap_cache.append(bitmap);
     return bitmap;
 }

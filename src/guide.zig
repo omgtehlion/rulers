@@ -7,7 +7,7 @@ const Base = @import("alpha_wnd.zig").AlphaWnd(processMsg);
 const Self = @This();
 
 base: Base,
-shared_bimap: ?*@import("cached_bitmap.zig") = null,
+shared_bimap: ?*gdip.CachedBitmap = null,
 vertical: bool,
 distance: i32 = 0,
 bounds: win.RECT,
@@ -94,7 +94,7 @@ fn repaint(self: *Self) !void {
     if (self.shared_bimap == null)
         self.shared_bimap = try globals.getBuffer(self.base.width, self.base.height);
     const buffer = if (self.shared_bimap) |b| b else return;
-    const graphics = try buffer.beginDraw();
+    const graphics = buffer.gd_graphics;
     try gdip.graphicsClear(graphics, gdip.makeColor(0, 0, 0, 0));
     const width = self.bounds.right - self.bounds.left;
     const height = self.bounds.bottom - self.bounds.top;
@@ -109,7 +109,7 @@ fn repaint(self: *Self) !void {
     self.last_control_state = globals.control_pressed;
     self.last_position = if (self.vertical) self.base.left else self.base.top;
     _ = try self.drawCoordinates(graphics);
-    self.base.update(try buffer.endDraw());
+    self.base.update(buffer.hdc);
 }
 
 fn drawCoordinates(self: *Self, graphics: *gdip.Graphics) !bool {

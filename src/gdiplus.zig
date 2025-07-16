@@ -332,3 +332,54 @@ pub fn resetClip(graphics: *Graphics) !void {
     if (status != .Ok)
         return statusToError(status);
 }
+
+pub const CachedBitmap = struct {
+    width: i32,
+    height: i32,
+    hbitmap: win.HBITMAP,
+    hdc: win.HDC,
+    bits: *anyopaque,
+    gd_bitmap: *Bitmap,
+    gd_graphics: *Graphics,
+
+    const Self = @This();
+
+    pub fn init(width: i32, height: i32) !Self {
+        const hdc = win.GetDC(null) orelse return error.GetDCFailed;
+        defer _ = win.ReleaseDC(null, hdc);
+        var bits: ?*anyopaque = null;
+        const hbitmap = win.CreateDIBSection(hdc, &std.mem.zeroInit(win.BITMAPV5HEADER, .{
+            .bV5Size = @sizeOf(win.BITMAPV5HEADER),
+            .bV5Width = width,
+            .bV5Height = -height, // Negative for top-down DIB
+            .bV5Planes = 1,
+            .bV5BitCount = 32,
+            .bV5Compression = win.BI_RGB,
+            .bV5RedMask = 0x00FF0000,
+            .bV5GreenMask = 0x0000FF00,
+            .bV5BlueMask = 0x000000FF,
+            .bV5AlphaMask = 0xFF000000,
+            .bV5CSType = win.LCS_WINDOWS_COLOR_SPACE,
+        }), win.DIB_RGB_COLORS, &bits, null, 0) orelse return error.CreateDIBSectionFailed;
+        const gd_bitmap = try createBitmapFromScan0(width, height, width * 4, PixelFormat32bppPARGB, bits);
+        const self = Self{
+            .width = width,
+            .height = height,
+            .hbitmap = hbitmap,
+            .bits = bits.?,
+            .hdc = win.CreateCompatibleDC(hdc) orelse return error.CreateCompatibleDCFailed,
+            .gd_bitmap = gd_bitmap,
+            .gd_graphics = try createGraphicsFromImage(@ptrCast(gd_bitmap)),
+        };
+        _ = win.SelectObject(self.hdc, hbitmap);
+        try setTextRenderingHint(self.gd_graphics, .TextRenderingHintAntiAliasGridFit);
+        return self;
+    }
+
+    pub fn deinit(self: *Self) void {
+        deleteGraphics(self.gd_graphics) catch {};
+        disposeImage(@ptrCast(self.gd_bitmap)) catch {};
+        _ = win.DeleteDC(self.hdc);
+        _ = win.DeleteObject(self.hbitmap);
+    }
+};

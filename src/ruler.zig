@@ -51,9 +51,9 @@ pub fn deinit(self: *Self) void {
 }
 
 fn createRuler(self: *Self) !void {
-    var bitmap = @import("cached_bitmap.zig").init(self.base.width, self.base.height);
+    var bitmap = try gdip.CachedBitmap.init(self.base.width, self.base.height);
     defer bitmap.deinit();
-    const graphics = try bitmap.beginDraw();
+    const graphics = bitmap.gd_graphics;
 
     // Create brushes and pens
     const white_brush = try gdip.createSolidFill(gdip.makeColor(255, 255, 255, 255));
@@ -148,7 +148,7 @@ fn createRuler(self: *Self) !void {
             try gdip.drawLineI(graphics, black_pen, x, RULER_WIDTH - l, x, RULER_WIDTH - 1);
         }
     }
-    self.base.update(try bitmap.endDraw());
+    self.base.update(bitmap.hdc);
 }
 
 fn createNew(self: *Self) void {
